@@ -268,9 +268,39 @@ ISSUE_LABELS=$(gh issue view <issue-number> --json labels --jq '[.labels[].name]
 # Always-on AI-attribution labels for ship_issue-authored PRs
 AI_LABELS="ai-tool: claude-code,ai-workflow: ai-authored"
 
+# Scope label — gates whether /port-pr is run against the sibling repo.
+# Default depends on the current repo (see resolution below).
+SCOPE_LABEL=<resolved-scope-label>     # e.g. scope:it-only / scope:hr-only / scope:shared
+
 # Combined list passed to gh pr create
-PR_LABELS="${ISSUE_LABELS},${AI_LABELS}"
+PR_LABELS="${ISSUE_LABELS},${AI_LABELS},${SCOPE_LABEL}"
 ```
+
+**Resolve the scope label** using this order:
+
+1. **Config file** — read `.agentic-sdlc/config.json` if it exists:
+   ```json
+   { "sibling": "LucaNet-Main/hr-servicedesk", "scope_default": "scope:it-only" }
+   ```
+   Use `scope_default` as the starting point.
+
+2. **Built-in fallback** — known servicedesks:
+   - `ai-servicedesk` → `scope:it-only`
+   - `hr-servicedesk` → `scope:hr-only`
+   - other → no scope label (skip the `SCOPE_LABEL` line)
+
+3. **Upgrade to `scope:shared`?** Check whether this PR's diff touches paths that are likely identical across both repos. If any of these match, prompt the user *"This diff touches generic paths (X, Y) — mark as `scope:shared` so it ports to the sibling?"*:
+   - `.github/workflows/`
+   - `prompts/` (top-level prompt files, not domain-specific subdirs)
+   - `docs/development/`
+   - `docs/decisions/`
+   - `CLAUDE.md` (the invariants section especially)
+   - `Makefile` / `pyproject.toml` (tooling)
+   - `.pre-commit-config.yaml`
+
+   The user can override either way. Default answer for an unambiguous diff is the repo-specific scope; default for a clearly-shared diff is `scope:shared`. One question, lead with your recommendation.
+
+   If `scope:shared` is chosen, the PR will be picked up by `/port-pr` after merge — either run on-demand by the user, or by a future auto-dispatch GitHub Action.
 
 Then create the PR with labels inline so it can't ship without them:
 
@@ -311,7 +341,7 @@ EOF
 gh pr view <pr-number> --json labels --jq '.labels[].name'
 ```
 
-The output must contain every label from `$ISSUE_LABELS` plus both AI labels. If the repo already had `ai-workflow: human-authored` auto-applied (some org-level workflows do this), remove it explicitly — these are AI-authored:
+The output must contain every label from `$ISSUE_LABELS` plus both AI labels plus exactly one `scope:*` label. If the repo already had `ai-workflow: human-authored` auto-applied (some org-level workflows do this), remove it explicitly — these are AI-authored:
 
 ```bash
 gh pr edit <pr-number> --remove-label "ai-workflow: human-authored" 2>/dev/null || true
@@ -351,7 +381,7 @@ Check against each of the following. For any finding, note it, fix it, commit th
 - [ ] All acceptance criteria from the issue are met
 - [ ] If architecture changed: `CLAUDE.md` and/or an ADR updated
 - [ ] PR description accurately describes the changes
-- [ ] PR labels match source issue (`type:*`, `priority:*`, `component:*`) plus `ai-tool: claude-code` and `ai-workflow: ai-authored`; no stray `ai-workflow: human-authored` left from org defaults
+- [ ] PR labels match source issue (`type:*`, `priority:*`, `component:*`) plus `ai-tool: claude-code` and `ai-workflow: ai-authored` plus exactly one `scope:*` label (`it-only` / `hr-only` / `shared`); no stray `ai-workflow: human-authored` left from org defaults
 
 Once all findings are resolved, mark the checklist items as done in the PR body:
 

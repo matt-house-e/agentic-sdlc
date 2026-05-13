@@ -12,6 +12,7 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 | `/create_issue <text>` | Creates a GitHub issue with the right type / priority / component labels |
 | `/create_branch <n>` | Creates a feature branch from an issue, with the right type prefix and a derived slug |
 | `/create_pr <n>` | Opens a PR linked to issue `#n` with correct labels and a `Closes #n` link |
+| `/port-pr <n>` | Ports a merged `scope:shared` PR from one repo into its sibling — applies the diff, resolves conflicts, opens a mirror PR with `Mirrors <owner>/<repo>#<n>` in the body |
 
 **Agents** (in `agents/`):
 
@@ -39,7 +40,7 @@ Add to a project's `.claude/settings.json`:
   "extraKnownMarketplaces": {
     "agentic-sdlc-local": {
       "source": {
-        "source": "local",
+        "source": "directory",
         "path": "/absolute/path/to/agentic-sdlc"
       }
     }
@@ -70,7 +71,44 @@ Examples of repo-invariant rules (drawn from real Lucanet servicedesk repos):
 
 `code-simplifier` reads these invariants in its phase 0 and embeds them in every parallel-lens prompt so they're never flagged as over-engineering.
 
+## Cross-repo porting (sibling servicedesks)
+
+Two sibling repos (`ai-servicedesk` / `hr-servicedesk`) share most of their tooling, agents, prompts, and infra — but each has domain-specific code that must *not* cross over. The plugin uses three PR labels to control porting:
+
+| Label | Meaning |
+|---|---|
+| `scope:it-only` | Default for `ai-servicedesk` PRs. Stays in the IT repo. |
+| `scope:hr-only` | Default for `hr-servicedesk` PRs. Stays in the HR repo. |
+| `scope:shared` | Generic change. After merge, `/port-pr` mirrors it into the sibling repo. |
+
+`/ship_issue` step 10 applies the default scope label based on the repo (or a `.agentic-sdlc/config.json` override) and offers to upgrade to `scope:shared` when the diff touches paths that are likely identical across both repos (`.github/workflows/`, `prompts/`, `CLAUDE.md`, `Makefile`, etc.).
+
+After a `scope:shared` PR merges, run `/port-pr <n>` from the sibling repo's working directory. It:
+
+1. Fetches the source PR's merged diff via `gh pr diff`
+2. Creates a `port/<source-repo>-<n>-<slug>` worktree from `origin/main`
+3. Applies the diff with `git apply --3way`, falling back to `--reject` for conflicts the agent resolves semantically
+4. Translates contextual domain tokens (paths, brand strings) without rewriting logic
+5. Verifies (lint + tests + relevant evals)
+6. Opens a mirror PR with `Mirrors <owner>/<repo>#<n>` in the body
+7. Enables auto-merge
+
+Per-repo configuration lives in `.agentic-sdlc/config.json`:
+
+```json
+{
+  "sibling": "LucaNet-Main/hr-servicedesk",
+  "scope_default": "scope:it-only"
+}
+```
+
+For known servicedesks (`ai-servicedesk` ↔ `hr-servicedesk`), the mapping is built in and the config file is optional.
+
+A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scope:shared` merge — see the bottom of `commands/port-pr.md` for the sketch.
+
 ## Status
 
+- v0.2.0 — `/port-pr` slash command + `scope:*` label set
+- v0.1.1 — fix: poll PR reviews directly in `ship_issue` step 12 (workflow_run head_sha gotcha)
 - v0.1.0 — initial extraction from sibling `ai-servicedesk` + `hr-servicedesk` repos
-- Not yet published anywhere; install via local marketplace
+- Installed via local-directory marketplace; not yet published
