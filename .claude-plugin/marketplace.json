@@ -1,0 +1,15 @@
+{
+  "name": "agentic-sdlc-local",
+  "owner": {
+    "name": "Matt House",
+    "email": "matt.house.e@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "agentic-sdlc",
+      "source": "./",
+      "description": "End-to-end agentic SDLC: issue → branch → worktree → PR → self-review → compounding loop → auto-merge",
+      "version": "0.1.0"
+    }
+  ]
+}
