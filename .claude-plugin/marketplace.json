@@ -9,7 +9,7 @@
       "name": "agentic-sdlc",
       "source": "./",
       "description": "End-to-end agentic SDLC: issue → branch → worktree → PR → self-review → compounding loop → auto-merge",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

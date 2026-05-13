@@ -1,7 +1,7 @@
 {
   "name": "agentic-sdlc",
   "description": "End-to-end agentic SDLC for Claude Code: issue → branch → worktree → implement → PR → self-review → compounding loop → auto-merge. Repo-agnostic; reads each project's CLAUDE.md for its invariants.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Matt House",
     "email": "matt.house.e@gmail.com"

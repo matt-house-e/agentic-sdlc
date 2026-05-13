@@ -368,18 +368,59 @@ EOF
 
 After self-review, close the loop: if the auto-reviewer (or a human) flagged a violation of a convention that isn't already written down, add a one-line invariant to this repo's `CLAUDE.md` so the same mistake can't be flagged on a future PR.
 
-### 12a. Wait for the auto-reviewer to post
+### 12a. Wait for a review newer than the latest commit
 
-If this repo has a Claude PR review workflow (`.github/workflows/claude-review.yml` or similar), it's typically gated on green CI — it fires after Lint succeeds, not at PR creation. Don't fetch comments until it has run, or the step will routinely no-op for the wrong reason.
+If this repo has a Claude PR review workflow (`.github/workflows/claude-review.yml` or similar), it's typically gated on green CI — it fires after Lint succeeds, not at PR creation. Don't fetch comments until a fresh review has landed, or the step will routinely no-op for the wrong reason.
+
+**Don't poll workflow runs by SHA.** The reviewer workflow uses `workflow_run` triggered by Lint, which itself runs on `pull_request`. `github.event.workflow_run.head_sha` therefore reports the **merge commit SHA**, not the PR head. Matching `gh run list --workflow="Claude PR review"` results against `pr.headRefOid` silently fails, and the loop never breaks. This is the single highest-cost gotcha in this step — don't rediscover it.
+
+**Do this instead.** Poll the PR's reviews directly and wait for one with a `submittedAt` newer than the latest commit's `committedDate`:
 
 ```bash
-gh pr checks --watch                    # block until all checks finish
-gh run list --workflow="Claude PR review" --branch=<branch> --limit 1
+gh pr checks --watch                    # first: block until Lint + other checks finish
+
+# Then wait for a review submitted after the latest commit
+until [ "$(gh pr view "$PR_NUMBER" --json reviews,commits --jq \
+  '(.reviews[-1].submittedAt // "") > (.commits[-1].commit.committedDate // "")')" = "true" ]; do
+  sleep 30
+done
+
+# Read the verdict
+gh pr view "$PR_NUMBER" --json reviewDecision --jq .reviewDecision
+# → APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED / COMMENTED / null
 ```
 
 If Lint failed (so the reviewer never gated in), or 10+ minutes pass with no reviewer run, surface this as a yellow note in the Done report and skip — do not block the ship.
 
-### 12b. Fetch review findings
+### 12b. Iterate until APPROVED
+
+The reviewer's first verdict may be `CHANGES_REQUESTED`. The slash command isn't done until it's `APPROVED` (or you decide to override and merge with `--admin`). Bound the loop so it can't run forever:
+
+```text
+attempts=0
+loop:
+  attempts=$((attempts + 1))
+  read verdict from 12a
+  case verdict in
+    APPROVED:
+      break
+    CHANGES_REQUESTED:
+      if attempts > 3:
+        surface in Done report, stop the slash command, hand back to user
+      fetch inline + summary findings (see 12c)
+      address each finding: edit, commit, push
+      go back to 12a (wait for a NEW review newer than the new commit)
+    COMMENTED or REVIEW_REQUIRED (no APPROVE yet):
+      treat as APPROVED for the compounding-loop purpose — there's nothing
+      blocking; novel findings still get harvested in 12c-e
+      break
+```
+
+Each iteration's commit message should reference the finding it addresses (`fix(<scope>): address reviewer note on X`). Don't squash these into one — the per-iteration log is useful evidence of the loop closing.
+
+If you hit the attempt cap, the reviewer disagrees with your fix, or you're confident the finding is wrong, **don't fold an incorrect rule into `CLAUDE.md`** — dismiss it inline (`gh pr review --dismiss …`) or surface to the user. Loops aren't free; if you're churning, ask for help.
+
+### 12c. Fetch review findings
 
 ```bash
 gh pr view $PR_NUMBER --json reviews,comments                # review verdicts + PR-level comments
@@ -389,7 +430,7 @@ gh api repos/<owner>/<repo>/issues/$PR_NUMBER/comments       # issue-style comme
 
 `gh pr view --json` does not expose `reviewThreads` (that's GraphQL-only), so use the REST endpoints for inline + issue comments. The `pulls/<n>/comments` endpoint carries the line-level findings from the inline-comment MCP tool; `issues/<n>/comments` carries the verdict + summary.
 
-### 12c. Classify each finding
+### 12d. Classify each finding
 
 Three buckets — be deterministic, don't invent rules to fill the step:
 
@@ -397,7 +438,7 @@ Three buckets — be deterministic, don't invent rules to fill the step:
 2. **Finding maps to an existing invariant** in `CLAUDE.md` `## Repo invariants` or an ADR → skip, but log *which* invariant caught it (useful signal that the system worked).
 3. **Finding cites a rule not yet in `CLAUDE.md` or an ADR** → propose a one-line invariant. Architecturally significant changes get an ADR instead; most findings are invariant-level.
 
-### 12d. Commit the addition
+### 12e. Commit the addition
 
 ```bash
 # For invariant-level findings:
@@ -415,7 +456,7 @@ git push
 
 The `docs(invariants):` / `docs(adr):` prefix keeps re-runs idempotent — if the step is run twice (e.g. a human reviewer adds comments after the auto-reviewer), only genuinely new rules get appended.
 
-### 12e. Rules of thumb
+### 12f. Rules of thumb
 
 - **One-line invariants only** under "Repo invariants" — paragraph-level guidance goes elsewhere (ADRs, prompt docs, this slash command)
 - **Imperative voice** — "Use X" / "Never Y", not "X is preferred"
