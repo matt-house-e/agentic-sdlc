@@ -188,7 +188,13 @@ Work through the task list from step 4. For each task:
 
 1. Implement it
 2. Verify it works:
-   - **Lint + format** — `make check` if the repo has a Makefile with that target, otherwise the repo's documented equivalent (e.g. `uv run ruff check . && uv run ruff format --check .`, `npm run lint`, `pre-commit run --files <changed>`). Check `CLAUDE.md` for the canonical command.
+   - **Lint + format — BOTH must pass.** Run `make check` if the repo has a Makefile with that target. Otherwise run **both** the linter AND the formatter-check explicitly — they are separate checks and CI runs them separately:
+     - Python/uv: `uv run ruff check . && uv run ruff format --check .`
+     - Python/pip: `ruff check . && ruff format --check .`
+     - JS/TS: `npm run lint && npm run format:check` (or the project's equivalent)
+     - Other: see `CLAUDE.md` for the canonical command.
+
+     `ruff check` only validates lint rules; `ruff format --check` validates whitespace/quotes/line breaks separately. **A green `ruff check` does NOT imply a green `ruff format --check`.** Run both. CI will fail on the formatter even if the linter is clean.
    - **Tests** — `make test` or the documented equivalent (`uv run pytest tests/`, `npm test`, etc.) — only after tasks that touch source under the runtime path.
    - **In a worktree, prefix Python tests with `PYTHONPATH=<worktree-abs-path>`** when the shell has a pre-set `PYTHONPATH` from the parent repo. Without this, `app.*` imports silently resolve to stale code in the parent checkout instead of your worktree edits — producing bogus `TypeError: got an unexpected keyword argument` failures despite a correct edit. Same applies to `make test` / `make eval`. Either prefix the command or `export PYTHONPATH=$PWD` in the worktree shell once.
 3. Commit it (see step 8)
@@ -335,19 +341,47 @@ EOF
 )"
 ```
 
-**Verify labels landed.** `gh pr create --label` silently no-ops on labels the repo doesn't have. Confirm the full set is on the PR before moving on:
+**Verify labels landed — hard gate.** `gh pr create --label` silently no-ops on labels the repo doesn't have, so verification is not optional. Run this block; it exits non-zero if any required label from the source issue is missing on the PR:
 
 ```bash
-gh pr view <pr-number> --json labels --jq '.labels[].name'
+PR_NUMBER=<your-pr-number>
+ISSUE_NUMBER=<source-issue-number>
+
+# Required = every label on the source issue, plus the AI-attribution labels
+ISSUE_LABELS=$(gh issue view "$ISSUE_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
+PR_ACTUAL=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
+
+MISSING=$(comm -23 <(echo "$ISSUE_LABELS") <(echo "$PR_ACTUAL"))
+if [ -n "$MISSING" ]; then
+  echo "FAIL: PR #$PR_NUMBER is missing labels copied from issue #$ISSUE_NUMBER:"
+  echo "$MISSING"
+  echo "Adding now..."
+  while IFS= read -r label; do
+    gh pr edit "$PR_NUMBER" --add-label "$label" || exit 1
+  done <<< "$MISSING"
+fi
+
+# Verify AI-attribution labels (only meaningful if the repo defines them — skip silently if not)
+for ai_label in "ai-tool: claude-code" "ai-workflow: ai-authored"; do
+  if gh label list --search "$ai_label" --json name --jq '.[].name' | grep -qx "$ai_label"; then
+    gh pr edit "$PR_NUMBER" --add-label "$ai_label" 2>/dev/null || true
+  fi
+done
+
+# Remove auto-applied human-authored if present (some org workflows add it by default)
+gh pr edit "$PR_NUMBER" --remove-label "ai-workflow: human-authored" 2>/dev/null || true
+
+# Final assertion — at minimum every label from the source issue must be on the PR
+FINAL=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
+STILL_MISSING=$(comm -23 <(echo "$ISSUE_LABELS") <(echo "$FINAL"))
+if [ -n "$STILL_MISSING" ]; then
+  echo "FAIL: labels still missing after add: $STILL_MISSING"
+  exit 1
+fi
+echo "OK: PR labels verified"
 ```
 
-The output must contain every label from `$ISSUE_LABELS` plus both AI labels plus exactly one `scope:*` label. If the repo already had `ai-workflow: human-authored` auto-applied (some org-level workflows do this), remove it explicitly — these are AI-authored:
-
-```bash
-gh pr edit <pr-number> --remove-label "ai-workflow: human-authored" 2>/dev/null || true
-```
-
-If any required label is missing, add it with `gh pr edit <pr-number> --add-label "<name>"` before continuing to self-review. Do not proceed with missing labels — downstream dashboards and the auto-reviewer depend on them.
+**Do not proceed past this gate with a non-zero exit.** Downstream dashboards and the auto-reviewer depend on these labels. If a label the issue carries doesn't exist in the repo's label vocabulary (`gh label list`), don't invent one — surface the gap to the user and pick the closest existing label.
 
 If a `component:*` label is missing because the repo uses a slightly different vocabulary (`component:ci` vs `component:ci-cd`, etc.), check `gh label list` and use whatever label exists for that area — don't invent labels.
 
