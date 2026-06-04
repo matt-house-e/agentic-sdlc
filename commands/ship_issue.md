@@ -184,6 +184,16 @@ Understand the existing pattern before writing any code. Lift and adapt — don'
 
 ## 7. Implement — one task at a time
 
+**Model routing (cost).** Everything before this step — read, plan, the plan stress-test (step 6) — and everything from step 9 on — verify, eval, self-review, PR — stays on the planning model (Opus). The per-task implementation loop below is the token-heavy phase (large, repeated context re-reads), so run it on Sonnet: dispatch a **single** `Agent` (`subagent_type: general-purpose`, `model: sonnet`) and have it carry the whole loop. Its prompt must be self-contained — the subagent has no session memory — and include:
+
+- The written task list from step 4 (the spec it implements against)
+- The repo invariants from step 6 and the §7 list below (binding constraints)
+- The worktree absolute path, and the `PYTHONPATH` note from item 2 below
+- The per-task verify + commit protocol (items 1–4 below, plus §8)
+- An explicit ask: *implement and commit every task in order, then return a one-paragraph summary of what changed and any task-plan corrections you had to make.*
+
+When the subagent returns, resume on Opus for §9. If the task plan turns out wrong mid-implementation, the subagent stops and reports back rather than patching over it (see below). Skip the delegation only for trivial issues (≤ ~20 lines, single file) — the subagent round-trip isn't worth it there; just implement inline.
+
 Work through the task list from step 4. For each task:
 
 1. Implement it
