@@ -35,6 +35,16 @@ So: **spend at the bottom of the stack (durable), rent the top (volatile).**
 | AGENTS.md + SKILL.md (open standards) | Which harness you run today |
 | Capability *roles* (planner/implementer) | The model behind each role |
 
+## A standing objective: good DX *and* AX
+
+Two experiences, both design targets:
+
+- **DX (developer experience)** — your three surfaces (design / build / review). The human stays in the loop where it matters and walks away where it doesn't.
+- **AX (agent experience)** — how well the *environment* is set up for the agent to perceive and act: fast/reliable tests, a sharp `AGENTS.md`, clean tool/CLI availability, clear errors.
+
+The pipeline **depends on** good AX and should **help maintain** it — the knowledge loop
+harvests AX/DX frictions (e.g. "tests too slow to use as a gate"), not just code invariants.
+
 ## The one nuance that makes this work
 
 A system that only *learns from you* calcifies your bad habits at scale. The knowledge

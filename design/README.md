@@ -17,6 +17,7 @@ not a finished spec. Every open decision is flagged 🔵.
 | 6 | [Constitution](06-constitution.md) | The seeded best-practice principles (draft) | 2 min |
 | 7 | [Build decisions](07-build-decisions.md) | The 3 reality-checks resolved + what's rent vs build | 3 min |
 | 8 | [Evals](08-evals.md) | How we measure "how we're doing" | 3 min |
+| 9 | [Safety & runtime](09-safety-and-runtime.md) | The AFK blast-radius model (sandbox + gates) | 3 min |
 | 4 | [Roadmap](04-roadmap.md) | Build now / defer / cut — sequenced | 3 min |
 | 5 | [Evidence](05-evidence.md) | The research behind every claim + citations | skim |
 
@@ -46,11 +47,15 @@ either already-shipped standards or premature:
 | Skills vs commands (RC2) | One explicit `/ship_issue` over internal **`SKILL.md` phase-skills**; **proceed-by-default, park-by-exception** |
 | Model roles (RC3) | Role→tier table; **aliases in pipeline, pinned in evals**; reviewer **Sonnet→Opus by risk** |
 | Evals | **Mine own git history** as golden set; deterministic graders; rent Inspect AI ([doc 8](08-evals.md)) |
+| AFK safety | Auto-mode gates interruption not blast radius → **sandbox + branch protection + credential hygiene** + risk-gated auto-merge ([doc 9](09-safety-and-runtime.md)) |
+| Context rot | **Discipline by architecture** (fresh phase contexts + hand-off), no hardcoded token limit |
+| DX + AX | Both are standing **objectives**; loop harvests AX/DX frictions too |
 
 **Still open:** start Phase 1 now, or one more design pass first? (🔵 in [roadmap](04-roadmap.md))
 
 **Deferred (tracked):** constitution pruning → [#4](https://github.com/matt-house-e/agentic-sdlc/issues/4)
-· per-area park-zone tuning → [#5](https://github.com/matt-house-e/agentic-sdlc/issues/5).
+· per-area park-zone tuning → [#5](https://github.com/matt-house-e/agentic-sdlc/issues/5)
+· AFK safety environment setup → [#6](https://github.com/matt-house-e/agentic-sdlc/issues/6).
 
 ## How to give feedback
 

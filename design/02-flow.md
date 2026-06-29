@@ -81,6 +81,20 @@ Research is blunt here: **multi-agent orchestration for coding is a fashionable 
 
 Subagents are for **context isolation**, never for parallelising the build.
 
+## Context discipline — by architecture, not by limit
+
+Long runs accumulate context, and attention degrades as they grow ("smart zone" → "dumb
+zone"); silent autocompaction then loses fidelity. The fix is **structural, not a token
+threshold** (a hardcoded limit would violate the thesis — that number only grows as windows
+do):
+
+- Each **phase-skill runs in a bounded/fresh context** — `plan` doesn't carry `work`'s noise.
+- The **JSON hand-off artifact *is* the compaction** — a deliberate, inspectable summary, not an automatic lossy one.
+- **No run leans on one giant accumulating context.** The decomposition gives smart-zone behaviour for free, and auto-rides bigger windows without changes.
+
+This is a second reason the decomposition matters — beyond portability, it's how the
+pipeline stays sharp on long work.
+
 ## Cost architecture (built in, not bolted on)
 
 Token *prices* fall ~10×/yr, but total *spend* rises (Jevons) and reasoning models bill

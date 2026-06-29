@@ -6,5 +6,6 @@
 - [6 · Constitution (draft)](06-constitution.md)
 - [7 · Build decisions](07-build-decisions.md)
 - [8 · Evals](08-evals.md)
+- [9 · Safety & runtime](09-safety-and-runtime.md)
 - [4 · Roadmap](04-roadmap.md)
 - [5 · Evidence](05-evidence.md)
