@@ -20,6 +20,18 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 |---|---|
 | `code-simplifier` | Reads the diff, fans out three parallel lenses (Reuse / Quality / Efficiency), applies the fixes |
 
+**Scripts** (in `scripts/`) — load-bearing plumbing extracted from the commands so it's
+versioned and testable (run `bash scripts/tests/run.sh`):
+
+| Script | What it does |
+|---|---|
+| `verify-pr-labels.sh <pr> <issue>` | Guarantees every source-issue label is on the PR (the `gh ... --label` silent-no-op gotcha); exits non-zero if any is still missing |
+| `wait-for-review.sh <pr> [timeout]` | Blocks until a PR review is submitted newer than the latest commit (polls reviews, not workflow runs by SHA); prints the verdict |
+| `prune-merged-worktrees.sh [--dry-run]` | Removes `*-wt-*` worktrees whose branch is gone from origin |
+
+**Model roles** — `MODELS.md` maps capability roles (`planner`/`implementer`/`reviewer`/`grunt`)
+to model tier aliases, so model choice is one edit and the pipeline auto-rides upgrades.
+
 ## Design
 
 The commands are **repo-agnostic**. Repo-specific bits (invariants, directory layout, label vocabulary, brand-name spelling) live in each project's `CLAUDE.md`. The commands read `CLAUDE.md` at runtime and defer to it.
@@ -108,6 +120,7 @@ A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scop
 
 ## Status
 
+- v0.3.0 — Phase 1: `ship_issue` stops owning isolation (detect-and-skip) + runs non-interactively; load-bearing bash extracted to tested `scripts/`; model roles in `MODELS.md`
 - v0.2.0 — `/port-pr` slash command + `scope:*` label set
 - v0.1.1 — fix: poll PR reviews directly in `ship_issue` step 12 (workflow_run head_sha gotcha)
 - v0.1.0 — initial extraction from sibling `ai-servicedesk` + `hr-servicedesk` repos

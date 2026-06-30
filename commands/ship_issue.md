@@ -52,25 +52,17 @@ git fetch origin main
 git worktree list
 ```
 
-**Resolve the base branch** using this decision tree:
+**Resolve the base branch non-interactively** — this command runs fire-and-forget, so it never blocks on a prompt:
 
 1. **Explicit base provided** (second argument, e.g. `/ship_issue 446 feat/13-some-base`):
-   - Use it directly. Then run:
-     ```bash
-     git ls-remote origin <base-branch>
-     ```
-   - If the branch is not on origin, warn: *"This base branch isn't pushed yet — the PR diff will include its commits until it merges. Push it first, or continue knowing the PR base will be noisy."* Don't block, but require acknowledgement.
+   - Use it directly. Check it's on origin: `git ls-remote origin <base-branch>`.
+   - If it's missing on origin, **don't block** — log a one-line warning to the run output (*"base branch not on origin; PR diff will include its commits until it merges"*) and proceed.
 
-2. **No explicit base + active worktrees exist**:
-   - List the active branches (from `git worktree list`, excluding main/HEAD entries).
-   - Ask: *"Active in-flight branches: [list]. Does this issue depend on any of these? Enter a branch name to use as base, or press enter to use `origin/main`."*
-   - If the user names a branch, apply the `git ls-remote` check above.
-   - If the user presses enter (or says no), use `origin/main`.
-
-3. **No explicit base + no active worktrees**:
-   - Use `origin/main` silently. No prompt needed.
+2. **No explicit base**: use `origin/main`. No prompt.
 
 Store the resolved base as `<resolved-base>` — used in step 5.
+
+> **Why no prompt for in-flight bases?** Under fire-and-forget the base is chosen *when you dispatch the run* — pass it as the second arg if this issue stacks on another branch. The pipeline never pauses to ask. If a genuine base ambiguity exists that you didn't resolve upfront, treat it as a scoping miss and **park to "Needs input"** per the proceed/park rule — don't guess silently.
 
 **Docker conflict risk**: if the repo's test suite runs against shared ports (Postgres, etc.) and multiple worktrees are active, stagger test runs manually.
 
@@ -157,18 +149,39 @@ If you skipped step 3 (trivial issue, no architectural decisions), skip this too
 
 ---
 
-## 5. Worktree setup
+## 5. Workspace setup — isolation is the harness's job
+
+**Detect first, create only if needed.** This command must NOT blindly create a worktree —
+under Agent View (`claude agents`) or `claude --bg --worktree` the harness has *already* put
+you in an isolated worktree, and creating another nests a worktree inside a worktree.
 
 ```bash
-# Derive branch type from issue labels (type:story→feat, type:task→task, type:bug→fix, type:spike→spike, type:epic→epic)
-# Derive slug from issue title (lowercase, hyphens, ~40 chars)
-# <resolved-base> comes from step 2
-
-REPO_SHORT=$(basename "$(git rev-parse --show-toplevel)")
-git worktree add ../${REPO_SHORT}-wt-<issue-number> -b <type>/<issue-number>-<slug> <resolved-base>
+# Are we already isolated? A linked worktree has a separate git dir from the main checkout.
+if [ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ]; then
+  ISOLATED=1   # already in a linked worktree — use it as-is
+else
+  ISOLATED=0   # main checkout (interactive / CI fallback)
+fi
 ```
 
-All remaining work happens inside `../${REPO_SHORT}-wt-<issue-number>`. Switch to that directory now and stay there.
+- **`ISOLATED=1`** (Agent View / `--bg --worktree`): **do not create a worktree.** Ensure
+  you're on a dedicated branch — if still on the default branch, create it in place
+  (`git switch -c <type>/<issue-number>-<slug> <resolved-base>`); otherwise use the current
+  branch. Stay in the current directory.
+- **`ISOLATED=0`** (interactive in the main checkout, or scripted CI): create the worktree
+  yourself as the fallback:
+  ```bash
+  REPO_SHORT=$(basename "$(git rev-parse --show-toplevel)")
+  git worktree add ../${REPO_SHORT}-wt-<issue-number> -b <type>/<issue-number>-<slug> <resolved-base>
+  ```
+  Then switch into `../${REPO_SHORT}-wt-<issue-number>` and stay there.
+
+Derive `<type>` from issue labels (type:story→feat, type:task→task, type:bug→fix,
+type:spike→spike, type:epic→epic) and `<slug>` from the issue title (lowercase, hyphens, ~40 chars).
+`<resolved-base>` comes from step 2.
+
+All remaining work happens in the isolated working directory. The skills below are
+**workspace-agnostic** — they operate on the current directory and never create their own isolation.
 
 ---
 
@@ -184,7 +197,7 @@ Understand the existing pattern before writing any code. Lift and adapt — don'
 
 ## 7. Implement — one task at a time
 
-**Model routing (cost).** Everything before this step — read, plan, the plan stress-test (step 6) — and everything from step 9 on — verify, eval, self-review, PR — stays on the planning model (Opus). The per-task implementation loop below is the token-heavy phase (large, repeated context re-reads), so run it on Sonnet: dispatch a **single** `Agent` (`subagent_type: general-purpose`, `model: sonnet`) and have it carry the whole loop. Its prompt must be self-contained — the subagent has no session memory — and include:
+**Model routing (cost).** Roles map to model tiers via `MODELS.md` (planner/reviewer → Opus tier, implementer → Sonnet tier, grunt → Haiku tier). Reference the **role**, not a hardcoded model name, and use the tier **alias** (`opus`/`sonnet`/`haiku`) so the pipeline auto-rides model upgrades. Everything before this step — read, plan, the plan stress-test (step 6) — and everything from step 9 on — verify, eval, PR — runs as the **planner** role (Opus tier); the self-review escalates Sonnet→Opus by risk per `MODELS.md`. The per-task implementation loop below is the token-heavy phase (large, repeated context re-reads), so run it as the **implementer** role (Sonnet tier): dispatch a **single** `Agent` (`subagent_type: general-purpose`, `model: sonnet`) and have it carry the whole loop. Its prompt must be self-contained — the subagent has no session memory — and include:
 
 - The written task list from step 4 (the spec it implements against)
 - The repo invariants from step 6 and the §7 list below (binding constraints)
@@ -305,18 +318,7 @@ PR_LABELS="${ISSUE_LABELS},${AI_LABELS},${SCOPE_LABEL}"
    - `hr-servicedesk` → `scope:hr-only`
    - other → no scope label (skip the `SCOPE_LABEL` line)
 
-3. **Upgrade to `scope:shared`?** Check whether this PR's diff touches paths that are likely identical across both repos. If any of these match, prompt the user *"This diff touches generic paths (X, Y) — mark as `scope:shared` so it ports to the sibling?"*:
-   - `.github/workflows/`
-   - `prompts/` (top-level prompt files, not domain-specific subdirs)
-   - `docs/development/`
-   - `docs/decisions/`
-   - `CLAUDE.md` (the invariants section especially)
-   - `Makefile` / `pyproject.toml` (tooling)
-   - `.pre-commit-config.yaml`
-
-   The user can override either way. Default answer for an unambiguous diff is the repo-specific scope; default for a clearly-shared diff is `scope:shared`. One question, lead with your recommendation.
-
-   If `scope:shared` is chosen, the PR will be picked up by `/port-pr` after merge — either run on-demand by the user, or by a future auto-dispatch GitHub Action.
+3. **Scope upgrade — non-interactive.** Default to the repo-specific scope from steps 1–2; **never prompt** to upgrade mid-run. If the diff touches paths likely identical across sibling repos (`.github/workflows/`, top-level `prompts/`, `docs/development/`, `docs/decisions/`, `CLAUDE.md`, `Makefile`/`pyproject.toml`, `.pre-commit-config.yaml`), keep the default scope **and add a one-line note to the PR body and the run digest**: *"touches generic paths — consider `scope:shared` + `/port-pr` after merge."* The human decides on review; the run never blocks. Promoting to `scope:shared` is a reversible label edit — exactly the kind of call to **defer, not park**.
 
 Then create the PR with labels inline so it can't ship without them:
 
@@ -354,41 +356,15 @@ EOF
 **Verify labels landed — hard gate.** `gh pr create --label` silently no-ops on labels the repo doesn't have, so verification is not optional. Run this block; it exits non-zero if any required label from the source issue is missing on the PR:
 
 ```bash
-PR_NUMBER=<your-pr-number>
+# Capture the PR number once — reused by self-review (§11), the compounding loop (§12),
+# and auto-merge (§13). $CLAUDE_PLUGIN_ROOT is set by Claude Code to this plugin's root.
+PR_NUMBER=<pr-number>
 ISSUE_NUMBER=<source-issue-number>
 
-# Required = every label on the source issue, plus the AI-attribution labels
-ISSUE_LABELS=$(gh issue view "$ISSUE_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
-PR_ACTUAL=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
-
-MISSING=$(comm -23 <(echo "$ISSUE_LABELS") <(echo "$PR_ACTUAL"))
-if [ -n "$MISSING" ]; then
-  echo "FAIL: PR #$PR_NUMBER is missing labels copied from issue #$ISSUE_NUMBER:"
-  echo "$MISSING"
-  echo "Adding now..."
-  while IFS= read -r label; do
-    gh pr edit "$PR_NUMBER" --add-label "$label" || exit 1
-  done <<< "$MISSING"
-fi
-
-# Verify AI-attribution labels (only meaningful if the repo defines them — skip silently if not)
-for ai_label in "ai-tool: claude-code" "ai-workflow: ai-authored"; do
-  if gh label list --search "$ai_label" --json name --jq '.[].name' | grep -qx "$ai_label"; then
-    gh pr edit "$PR_NUMBER" --add-label "$ai_label" 2>/dev/null || true
-  fi
-done
-
-# Remove auto-applied human-authored if present (some org workflows add it by default)
-gh pr edit "$PR_NUMBER" --remove-label "ai-workflow: human-authored" 2>/dev/null || true
-
-# Final assertion — at minimum every label from the source issue must be on the PR
-FINAL=$(gh pr view "$PR_NUMBER" --json labels --jq '[.labels[].name] | sort | .[]')
-STILL_MISSING=$(comm -23 <(echo "$ISSUE_LABELS") <(echo "$FINAL"))
-if [ -n "$STILL_MISSING" ]; then
-  echo "FAIL: labels still missing after add: $STILL_MISSING"
-  exit 1
-fi
-echo "OK: PR labels verified"
+# verify-pr-labels.sh adds any source-issue labels missing from the PR (the silent-no-op
+# gotcha), applies the AI-attribution labels if the repo defines them, strips a stray
+# `ai-workflow: human-authored`, and exits non-zero if any required label is still missing.
+"$CLAUDE_PLUGIN_ROOT/scripts/verify-pr-labels.sh" "$PR_NUMBER" "$ISSUE_NUMBER"
 ```
 
 **Do not proceed past this gate with a non-zero exit.** Downstream dashboards and the auto-reviewer depend on these labels. If a label the issue carries doesn't exist in the repo's label vocabulary (`gh label list`), don't invent one — surface the gap to the user and pick the closest existing label.
@@ -453,15 +429,11 @@ If this repo has a Claude PR review workflow (`.github/workflows/claude-review.y
 ```bash
 gh pr checks --watch                    # first: block until Lint + other checks finish
 
-# Then wait for a review submitted after the latest commit
-until [ "$(gh pr view "$PR_NUMBER" --json reviews,commits --jq \
-  '(.reviews[-1].submittedAt // "") > (.commits[-1].commit.committedDate // "")')" = "true" ]; do
-  sleep 30
-done
-
-# Read the verdict
-gh pr view "$PR_NUMBER" --json reviewDecision --jq .reviewDecision
-# → APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED / COMMENTED / null
+# wait-for-review.sh polls the PR's reviews directly (never workflow runs by SHA), blocks
+# until one is submitted newer than the latest commit, prints the reviewDecision, and exits
+# 2 on timeout (default 600s) — treated as a yellow note, not a hard fail.
+VERDICT=$("$CLAUDE_PLUGIN_ROOT/scripts/wait-for-review.sh" "$PR_NUMBER" 600) || true
+# VERDICT → APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED / COMMENTED / null (empty on TIMEOUT)
 ```
 
 If Lint failed (so the reviewer never gated in), or 10+ minutes pass with no reviewer run, surface this as a yellow note in the Done report and skip — do not block the ship.
@@ -567,14 +539,13 @@ Report:
 - Compounding loop result — invariants added, skip-rationale, or yellow note (reviewer timeout / Lint failed)
 - Any follow-on issues to create (if scope was narrowed during implementation)
 
-The auto-merge from step 13 will land the PR and delete the remote branch when checks + review align. After that, clean up the local worktree:
+The auto-merge from step 13 will land the PR and delete the remote branch when checks + review align. After that, clean up merged worktrees with the prune script — it removes any `*-wt-*` worktree whose branch no longer exists on origin, and deletes the local branch:
 
 ```bash
-git worktree remove ../<repo>-wt-<issue-number>
-git branch -d <branch-name>
+"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"        # add --dry-run to preview
 ```
 
-If worktrees have piled up because their PRs merged while you were elsewhere, walk `git worktree list` and remove any whose upstream branch no longer exists on origin (`git ls-remote origin <branch>` returns empty).
+Under Agent View / `--bg --worktree` the harness owns the worktree lifecycle, so this prune is only needed for the interactive/CI fallback path from step 5.
 
 ---
 
