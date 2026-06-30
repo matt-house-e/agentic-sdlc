@@ -32,9 +32,14 @@ versioned and testable (run `bash scripts/tests/run.sh`):
 **Model roles** — `MODELS.md` maps capability roles (`planner`/`implementer`/`reviewer`/`grunt`)
 to model tier aliases, so model choice is one edit and the pipeline auto-rides upgrades.
 
+**Knowledge layer** — `KNOWLEDGE.md` defines the two-tier model the compounding loop feeds:
+**invariants** (taste/convention — enforced) and the **constitution** (best-practice
+principles — justify-or-deviate), with an admission bar to prevent rule bloat.
+`templates/constitution.md` is an installable seed host repos curate.
+
 ## Design
 
-The commands are **repo-agnostic**. Repo-specific bits (invariants, directory layout, label vocabulary, brand-name spelling) live in each project's `CLAUDE.md`. The commands read `CLAUDE.md` at runtime and defer to it.
+The commands are **repo-agnostic**. Repo-specific bits (invariants, directory layout, label vocabulary, brand-name spelling) live in each project's `AGENTS.md` — the canonical knowledge home (`CLAUDE.md` is imported from it) — in two tiers, invariants and constitution (see `KNOWLEDGE.md`). The commands read it at runtime and defer to it.
 
 Runtime detection of project flavor:
 
@@ -120,6 +125,7 @@ A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scop
 
 ## Status
 
+- v0.4.0 — Phase 2: two-tier knowledge model (`KNOWLEDGE.md`) — invariants (enforced) + constitution (justify-or-deviate); installable `templates/constitution.md`; compounding loop central-judges findings + admission bar + tier routing; `code-simplifier` reads the constitution
 - v0.3.0 — Phase 1: `ship_issue` stops owning isolation (detect-and-skip) + runs non-interactively; load-bearing bash extracted to tested `scripts/`; model roles in `MODELS.md`
 - v0.2.0 — `/port-pr` slash command + `scope:*` label set
 - v0.1.1 — fix: poll PR reviews directly in `ship_issue` step 12 (workflow_run head_sha gotcha)
