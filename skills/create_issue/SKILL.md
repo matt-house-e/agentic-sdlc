@@ -1,6 +1,6 @@
 ---
+name: create_issue
 description: Create a GitHub issue following project conventions, with the right type / priority / component labels
-accepts_args: true
 argument-hint: <plain-english request>
 ---
 

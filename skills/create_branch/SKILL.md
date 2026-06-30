@@ -1,6 +1,6 @@
 ---
+name: create_branch
 description: Create a git branch from a GitHub issue, with the right type prefix and a derived slug
-accepts_args: true
 argument-hint: <issue-number>
 ---
 

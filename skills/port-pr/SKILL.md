@@ -1,6 +1,6 @@
 ---
+name: port-pr
 description: Port a merged scope:shared PR from one servicedesk repo to its sibling — apply the diff, resolve conflicts, open a mirror PR
-accepts_args: true
 argument-hint: <source-pr-number> [<source-owner>/<source-repo>]
 ---
 
