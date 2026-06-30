@@ -57,7 +57,7 @@ Use only labels that exist. Common ones across Python service repos:
 - `component:ci` / `component:ci-cd` — CI/CD workflows
 - `component:infra` — infrastructure / deployment
 
-If the relevant area doesn't have a matching label, mention this in the issue body and tag the closest match — don't invent a new label inside this command.
+If the relevant area doesn't have a matching label, mention this in the issue body and tag the closest match — don't invent a new label inside this skill.
 
 ---
 

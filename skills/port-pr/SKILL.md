@@ -9,9 +9,9 @@ Port the merged source PR #$ARGUMENTS into the sibling repo as a new mirror PR.
 `$ARGUMENTS` is either `<source-pr-number>` or `<source-pr-number> <source-owner>/<source-repo>`.
 Parse them now: first token is the PR number, second (optional) is the explicit source repo.
 
-This command is repo-agnostic — it detects source/sibling at runtime. Run it from
+This skill is repo-agnostic — it detects source/sibling at runtime. Run it from
 the **sibling** working directory (the repo the port lands in). If the source
-repo isn't explicitly given, the command resolves it from `.agentic-sdlc/config.json`
+repo isn't explicitly given, the skill resolves it from `.agentic-sdlc/config.json`
 or falls back to a built-in mapping for the two known servicedesks.
 
 ---
