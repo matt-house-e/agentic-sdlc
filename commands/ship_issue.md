@@ -9,9 +9,10 @@ Ship issue #$ARGUMENTS from first read to merged PR, entirely self-contained.
 `$ARGUMENTS` is either `<issue-number>` or `<issue-number> <base-branch>`.
 Parse them now: first token is the issue number, second (optional) token is the explicit base branch.
 
-This command is repo-agnostic — it detects the project at runtime. Each repo's
-specific invariants live in that repo's `CLAUDE.md` (`## Repo invariants`
-section). Read that file early in step 6 and treat it as authoritative.
+This command is repo-agnostic — it detects the project at runtime. Each repo's knowledge
+lives in its canonical home (`AGENTS.md`; `CLAUDE.md` is imported from it) in two tiers —
+**invariants** (enforced) and the **constitution** (justify-or-deviate principles). Read
+them early in step 6 and treat them as authoritative. See this plugin's `KNOWLEDGE.md` for the model.
 
 ---
 
@@ -225,7 +226,7 @@ Work through the task list from step 4. For each task:
 
 **If implementation reveals the task plan was wrong** — stop, update the task plan, then re-implement the affected task cleanly. Do not accumulate patches on top of a wrong approach.
 
-**Enforce this repo's invariants throughout.** They are documented in `CLAUDE.md` under `## Repo invariants` (or the repo's equivalent section). Treat them as binding: a passing PR must not violate any of them. Common categories that often surface here:
+**Enforce this repo's invariants throughout.** They are documented in the knowledge home (`AGENTS.md`/`CLAUDE.md`, `## Repo invariants`). Treat them as binding: a passing PR must not violate any. The repo's **constitution** principles also apply, but as *justify-or-deviate* — a conscious, defensible deviation is allowed; silent drift is not. Common invariant categories that surface here:
 
 - **Data model** — Pydantic / dataclass / TypedDict choice; structured-output mechanism
 - **State management** — fat state / context object pattern; how new fields land
@@ -391,6 +392,9 @@ Check against each of the following. For any finding, note it, fix it, commit th
 - [ ] No new patterns introduced when an existing one fits
 - [ ] Brand/spelling conventions followed (check `CLAUDE.md`)
 
+**Principles (constitution — justify-or-deviate)**
+- [ ] No unjustified violation of the host repo's constitution principles (see `AGENTS.md`/`CLAUDE.md`, or seed from this plugin's `templates/constitution.md`). A violation isn't auto-fail — **justify the deviation in one line, or fix it.** Present evidence beats the stored principle, but the deviation must be conscious, not drift.
+
 **Quality**
 - [ ] No dead code, commented-out blocks, or TODO stubs left in
 - [ ] Type hints used throughout (in typed codebases)
@@ -416,7 +420,7 @@ EOF
 
 ## 12. Compounding loop — feed review findings back into the rules
 
-After self-review, close the loop: if the auto-reviewer (or a human) flagged a violation of a convention that isn't already written down, add a one-line invariant to this repo's `CLAUDE.md` so the same mistake can't be flagged on a future PR.
+After self-review, close the loop: a genuine review finding that cites a rule not yet written down gets harvested into the host repo's knowledge home (`AGENTS.md` is canonical — `CLAUDE.md` is imported from it). The knowledge has **two tiers** (see this plugin's `KNOWLEDGE.md`): **invariants** (taste/convention — *enforced*) and the **constitution** (best-practice principles — *justify-or-deviate*). Route each finding to the right tier, and only add a rule that clears the **admission bar**.
 
 ### 12a. Wait for a review newer than the latest commit
 
@@ -476,38 +480,52 @@ gh api repos/<owner>/<repo>/issues/$PR_NUMBER/comments       # issue-style comme
 
 `gh pr view --json` does not expose `reviewThreads` (that's GraphQL-only), so use the REST endpoints for inline + issue comments. The `pulls/<n>/comments` endpoint carries the line-level findings from the inline-comment MCP tool; `issues/<n>/comments` carries the verdict + summary.
 
-### 12d. Classify each finding
+### 12d. Judge, then classify each finding
 
-Three buckets — be deterministic, don't invent rules to fill the step:
+**First, central-judge legitimacy.** Before harvesting anything, decide whether each finding is *actually correct* — reviewers (bot or human) are sometimes confidently wrong. Reject illegitimate findings (dismiss inline; never fold an incorrect rule in). Only legitimate findings proceed.
 
-1. **APPROVE + zero inline comments, or only style nits / praise** → skip the step entirely. Note "no novel findings" in the Done report.
-2. **Finding maps to an existing invariant** in `CLAUDE.md` `## Repo invariants` or an ADR → skip, but log *which* invariant caught it (useful signal that the system worked).
-3. **Finding cites a rule not yet in `CLAUDE.md` or an ADR** → propose a one-line invariant. Architecturally significant changes get an ADR instead; most findings are invariant-level.
+**Then classify — be deterministic, don't invent rules to fill the step:**
+
+1. **APPROVE + zero inline comments, or only style nits / praise** → skip. Note "no novel findings" in the Done report.
+2. **Finding maps to an existing invariant or constitution principle** (in `AGENTS.md`/`CLAUDE.md`) or an ADR → skip, but log *which* rule caught it (signal that the system worked).
+3. **Finding cites a rule not yet written down** → harvest it, but only if it clears the **admission bar**: *"would removing this rule let a real mistake through?"* If not, don't add it. Then route by tier:
+   - **Taste / convention** (this project's arbitrary-but-consistent choice) → a one-line **invariant** (enforced).
+   - **Best-practice principle** (objective engineering rule) → a one-line **constitution** principle (justify-or-deviate). Seed from `templates/constitution.md` if the repo has none yet.
+   - **Architecturally significant** → an ADR instead. Most findings are invariant- or principle-level.
 
 ### 12e. Commit the addition
 
+Write to the canonical knowledge home (`AGENTS.md`; if the repo still uses `CLAUDE.md` directly, write there) — **edit the file first**, then stage and commit with the tier-specific prefix so re-runs stay idempotent:
+
 ```bash
-# For invariant-level findings:
-# Append one bullet to "Repo invariants" in CLAUDE.md
-git add CLAUDE.md
+KNOWLEDGE_HOME=AGENTS.md   # or CLAUDE.md if the repo hasn't migrated
+
+# Taste/convention → append a bullet to the invariants section, then:
+git add "$KNOWLEDGE_HOME"
 git commit -m "docs(invariants): <one-line rule> (review of #$ARGUMENTS)"
 
-# For architectural findings:
-# Create docs/decisions/NNN-<topic>.md following the ADR template (or the repo's equivalent)
+# Best-practice principle → append to the constitution section
+# (seed from templates/constitution.md first if the repo has none), then:
+git add "$KNOWLEDGE_HOME"
+git commit -m "docs(constitution): <one-line principle> (review of #$ARGUMENTS)"
+
+# Architecturally significant → an ADR:
+# Create docs/decisions/NNN-<topic>.md following the repo's ADR template, then:
 git add docs/decisions/
 git commit -m "docs(adr): <decision> (review of #$ARGUMENTS)"
 
 git push
 ```
 
-The `docs(invariants):` / `docs(adr):` prefix keeps re-runs idempotent — if the step is run twice (e.g. a human reviewer adds comments after the auto-reviewer), only genuinely new rules get appended.
+The `docs(invariants):` / `docs(constitution):` / `docs(adr):` prefixes keep re-runs idempotent — if the step runs twice (e.g. a human adds comments after the auto-reviewer), only genuinely new rules get appended.
 
 ### 12f. Rules of thumb
 
-- **One-line invariants only** under "Repo invariants" — paragraph-level guidance goes elsewhere (ADRs, prompt docs, this slash command)
-- **Imperative voice** — "Use X" / "Never Y", not "X is preferred"
-- **No invariants on this very PR** — if the change *is* the workflow tweak, expect "no novel findings" and skip cleanly
-- **Don't argue with the reviewer** — if a finding is wrong, dismiss it inline; don't fold incorrect rules into `CLAUDE.md`
+- **Clear the admission bar** — add a rule only if removing it would let a real mistake through. Keep the always-loaded file lean (bloat → ignored rules).
+- **One line, imperative** — "Use X" / "Never Y", not "X is preferred". Invariants are *enforced*; constitution principles are *justify-or-deviate*.
+- **One-line entries only** — paragraph-level guidance goes elsewhere (ADRs, prompt docs, this slash command).
+- **No rules harvested from this very PR** — if the change *is* the workflow tweak, expect "no novel findings" and skip cleanly.
+- **Don't argue with the reviewer** — if a finding is wrong, reject it in central judging and dismiss inline; never fold an incorrect rule into the knowledge home.
 
 ---
 
