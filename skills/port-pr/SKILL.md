@@ -153,7 +153,7 @@ make check        # or the repo's documented equivalent
 make test         # or the repo's documented equivalent
 ```
 
-In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — same gotcha as `ship_issue` step 7.
+In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — the same gotcha the `ship-work` / `ship-verify` phase-skills document.
 
 If a relevant eval framework exists (`test -d evals/`) and the source PR touched agent-observable behavior, run the matching scenarios. Don't run the full eval suite.
 
@@ -242,7 +242,7 @@ Add any missing labels with `gh pr edit <pr-number> --add-label`.
 
 ## 9. Enable auto-merge
 
-Same as `ship_issue` step 13:
+The same auto-merge plumbing the `ship_issue` orchestrator runs once the PR is open:
 
 ```bash
 gh pr merge <pr-number> --auto --squash --delete-branch
