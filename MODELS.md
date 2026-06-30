@@ -5,7 +5,9 @@ a model **tier alias** — so swapping a model is one edit here, and the pipelin
 model upgrades within a tier.
 
 Claude Code has no runtime that reads this file; it's the **single source of truth** that the
-commands/skills resolve into their `model:` fields (or `Agent` dispatch `model:` argument).
+skills resolve into their `Agent` dispatch `model:` argument (the orchestrator and
+plan / review / learn phases run as the planner tier; `ship-work` delegates its heavy loop to
+the implementer tier; `ship-simplify` delegates to the `code-simplifier` agent).
 
 ## Role → tier
 

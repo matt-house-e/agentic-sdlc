@@ -4,15 +4,34 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 
 ## What it ships
 
-**Slash commands** (in `commands/`):
+**Skills** (in `skills/`) — authored in the portable [`SKILL.md`](https://agentskills.io) standard
+(slash commands have merged into skills; invoke any of these as `/<name>`):
 
-| Command | What it does |
+| Skill | What it does |
 |---|---|
-| `/ship_issue <n>` | Ships issue `#n` end-to-end: plan → worktree → implement → test → PR → self-review → compounding loop → auto-merge |
+| `/ship_issue <n>` | Ships issue `#n` end-to-end: plan → work → simplify → verify → PR → review → compounding loop → auto-merge. A **thin orchestrator** over six isolated phase-skills (see below) |
 | `/create_issue <text>` | Creates a GitHub issue with the right type / priority / component labels |
 | `/create_branch <n>` | Creates a feature branch from an issue, with the right type prefix and a derived slug |
 | `/create_pr <n>` | Opens a PR linked to issue `#n` with correct labels and a `Closes #n` link |
 | `/port-pr <n>` | Ports a merged `scope:shared` PR from one repo into its sibling — applies the diff, resolves conflicts, opens a mirror PR with `Mirrors <owner>/<repo>#<n>` in the body |
+
+**Phase-skills** (in `skills/ship-*/`) — the six stages `/ship_issue` runs in order, each in a
+**fresh, isolated context** (`context: fork`) that hands a small JSON envelope back to the
+orchestrator. They are internal (`user-invocable: false`) — the orchestrator invokes them, you don't:
+
+| Phase-skill | What it does |
+|---|---|
+| `ship-plan` | Understands the issue, self-grills the approach, breaks it into atomic tasks, runs a fresh-Claude plan stress-test, writes the approach + decisions to the issue |
+| `ship-work` | Implements one task at a time (single-threaded, full context; delegates the heavy loop to an implementer-tier subagent), lint+test+commit per task |
+| `ship-simplify` | Dispatches `code-simplifier`, applies its cleanups, commits them separately |
+| `ship-verify` | The deterministic spine — lint **and** format, tests, filtered evals; fails closed on any red gate |
+| `ship-review` | Fresh-context self-review of the PR diff (unbiased by authorship) against conventions / constitution / quality / completeness |
+| `ship-learn` | The compounding loop — harvests legitimate, novel review findings into the host repo's knowledge home, routed by tier |
+
+The hand-off between phases is governed by a **state-envelope contract**
+(`skills/ship_issue/CONTRACT.md`): a thin JSON envelope (handles + status + an append-only
+decisions ledger + one prose line) over a re-readable substrate (the issue, PR diff, and commits).
+This is what keeps decomposition from drifting — see the contract for the full rationale.
 
 **Agents** (in `agents/`):
 
@@ -20,7 +39,7 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 |---|---|
 | `code-simplifier` | Reads the diff, fans out three parallel lenses (Reuse / Quality / Efficiency), applies the fixes |
 
-**Scripts** (in `scripts/`) — load-bearing plumbing extracted from the commands so it's
+**Scripts** (in `scripts/`) — load-bearing plumbing extracted from the skills so it's
 versioned and testable (run `bash scripts/tests/run.sh`):
 
 | Script | What it does |
@@ -39,7 +58,7 @@ principles — justify-or-deviate), with an admission bar to prevent rule bloat.
 
 ## Design
 
-The commands are **repo-agnostic**. Repo-specific bits (invariants, directory layout, label vocabulary, brand-name spelling) live in each project's `AGENTS.md` — the canonical knowledge home (`CLAUDE.md` is imported from it) — in two tiers, invariants and constitution (see `KNOWLEDGE.md`). The commands read it at runtime and defer to it.
+The skills are **repo-agnostic**. Repo-specific bits (invariants, directory layout, label vocabulary, brand-name spelling) live in each project's `AGENTS.md` — the canonical knowledge home (`CLAUDE.md` is imported from it) — in two tiers, invariants and constitution (see `KNOWLEDGE.md`). The skills read it at runtime and defer to it.
 
 Runtime detection of project flavor:
 
@@ -74,11 +93,11 @@ Then in that project:
 /plugin install agentic-sdlc@agentic-sdlc-local
 ```
 
-Plugin commands take precedence over repo-level `.claude/commands/*.md`, so per-repo duplicates can be removed.
+Plugin skills take precedence over repo-level `.claude/commands/*.md` and `.claude/skills/*/`, so per-repo duplicates can be removed.
 
 ## Where the per-repo bits live
 
-Each project's `CLAUDE.md` should include a `## Repo invariants` section listing one-line rules that PRs must satisfy. The compounding loop in `/ship_issue` step 12 grows this section over time: when the auto-reviewer flags a violation of a rule that isn't yet written down, the rule is appended automatically.
+Each project's `CLAUDE.md` should include a `## Repo invariants` section listing one-line rules that PRs must satisfy. The compounding loop — `/ship_issue`'s `ship-learn` phase — grows this section over time: when the auto-reviewer flags a violation of a rule that isn't yet written down, the rule is appended automatically.
 
 Examples of repo-invariant rules (drawn from real Lucanet servicedesk repos):
 
@@ -98,7 +117,7 @@ Two sibling repos (`ai-servicedesk` / `hr-servicedesk`) share most of their tool
 | `scope:hr-only` | Default for `hr-servicedesk` PRs. Stays in the HR repo. |
 | `scope:shared` | Generic change. After merge, `/port-pr` mirrors it into the sibling repo. |
 
-`/ship_issue` step 10 applies the default scope label based on the repo (or a `.agentic-sdlc/config.json` override) and offers to upgrade to `scope:shared` when the diff touches paths that are likely identical across both repos (`.github/workflows/`, `prompts/`, `CLAUDE.md`, `Makefile`, etc.).
+`/ship_issue`'s open-PR plumbing applies the default scope label based on the repo (or a `.agentic-sdlc/config.json` override) and notes a possible upgrade to `scope:shared` when the diff touches paths that are likely identical across both repos (`.github/workflows/`, `prompts/`, `CLAUDE.md`, `Makefile`, etc.).
 
 After a `scope:shared` PR merges, run `/port-pr <n>` from the sibling repo's working directory. It:
 
@@ -121,10 +140,11 @@ Per-repo configuration lives in `.agentic-sdlc/config.json`:
 
 For known servicedesks (`ai-servicedesk` ↔ `hr-servicedesk`), the mapping is built in and the config file is optional.
 
-A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scope:shared` merge — see the bottom of `commands/port-pr.md` for the sketch.
+A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scope:shared` merge — see the bottom of `skills/port-pr/SKILL.md` for the sketch.
 
 ## Status
 
+- v0.5.0 — Phase 3: decomposed `/ship_issue` into six isolated `SKILL.md` phase-skills (`ship-plan/work/simplify/verify/review/learn`) behind a **state-envelope contract** (`skills/ship_issue/CONTRACT.md`); `/ship_issue` is now a thin orchestrator; migrated all `commands/` to the portable `skills/` format
 - v0.4.0 — Phase 2: two-tier knowledge model (`KNOWLEDGE.md`) — invariants (enforced) + constitution (justify-or-deviate); installable `templates/constitution.md`; compounding loop central-judges findings + admission bar + tier routing; `code-simplifier` reads the constitution
 - v0.3.0 — Phase 1: `ship_issue` stops owning isolation (detect-and-skip) + runs non-interactively; load-bearing bash extracted to tested `scripts/`; model roles in `MODELS.md`
 - v0.2.0 — `/port-pr` slash command + `scope:*` label set
