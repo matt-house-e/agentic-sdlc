@@ -172,7 +172,16 @@ recovers the *why* by re-reading — no transcript required:
   colliding with the bundled `/verify`, `/review`, `/simplify` skills.
 - **Workspace-agnostic:** phases operate on the current working directory and **never create
   their own worktree**. Isolation is the orchestrator's (and ultimately the harness's) job.
-- **Model routing** stays role-based (see `MODELS.md`): the orchestrator and the
-  plan / review / learn phases run as the **planner** tier; **work** delegates its token-heavy
-  implementation loop to an **implementer**-tier (Sonnet) subagent; **simplify** delegates to
-  the `code-simplifier` agent. Reference roles/aliases, never pinned model IDs.
+- **Model routing** is role-based (see `MODELS.md`) but achieved two ways, because a skill's
+  frontmatter cannot pin a `model:` directly:
+  1. The orchestrator and the plan / review / learn forks **inherit the session tier** — launch
+     `/ship_issue` at the **planner** tier and they follow it (a `context: fork` uses the default
+     `general-purpose` agent, which inherits the session model). There is no per-fork pin.
+  2. **work** and **simplify** pin their *nested* subagents explicitly: work dispatches an
+     **implementer**-tier (Sonnet) `Agent` for the token-heavy loop; simplify dispatches the
+     `code-simplifier` agent. Reference roles/aliases, never pinned model IDs.
+
+  **Known limitation:** forcing a single fork onto a different tier than the session (e.g. running
+  only `review` on a cheaper tier) needs dedicated per-tier agent types in `agents/` and is **not
+  yet wired** — tracked as a follow-up. Today, tiering for the read-heavy forks = the tier you
+  launch the run at.

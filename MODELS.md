@@ -4,10 +4,12 @@ The pipeline references **capability roles**, never hardcoded model names. Each 
 a model **tier alias** — so swapping a model is one edit here, and the pipeline auto-rides
 model upgrades within a tier.
 
-Claude Code has no runtime that reads this file; it's the **single source of truth** that the
-skills resolve into their `Agent` dispatch `model:` argument (the orchestrator and
-plan / review / learn phases run as the planner tier; `ship-work` delegates its heavy loop to
-the implementer tier; `ship-simplify` delegates to the `code-simplifier` agent).
+Claude Code has no runtime that reads this file; it's the **single source of truth** the skills
+resolve into, via two routing paths (a skill's frontmatter can't pin a `model:` directly):
+the orchestrator and the plan / review / learn forks **inherit the session tier** (launch
+`/ship_issue` at the planner tier and they follow); `ship-work` and `ship-simplify` pin their
+*nested* `Agent` dispatches explicitly (implementer tier for the work loop, the
+`code-simplifier` agent for simplify). Per-fork model pinning is **not yet wired** (a follow-up).
 
 ## Role → tier
 
