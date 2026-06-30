@@ -218,7 +218,7 @@ owns the worktree lifecycle):
 
 - **Issue is actually two issues** → `ship-plan` parks asking to split it.
 - **Unresolved design decision** → park with options, don't pick arbitrarily.
-- **Tests fail in a way the phase doesn't understand** → `failed`; push the branch, open a draft PR with findings.
+- **Tests fail in a way the phase doesn't understand** → `work`/`verify` first escalate to the `ce-debug` diagnosis skill (non-interactive); only if that can't root-cause-and-fix it does the phase return `failed` (push the branch, draft PR with the Debug Summary).
 - **Implementation would touch >8 files** → a sign the issue needs splitting; park.
 
 A `parked` or `failed` envelope from any phase stops the pipeline cleanly and hands back to the
