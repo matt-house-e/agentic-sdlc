@@ -23,12 +23,13 @@ Whatever you find becomes the `<repo-invariants>` block embedded in every lens p
 
 ## Phase 1 — Capture the diff
 
-```bash
-git diff main...HEAD --stat
-git diff main...HEAD
-```
+The dispatching prompt should tell you the base branch to diff against (a stacked PR's base is
+often not `main`). Use that value; if none was given, default to `main`:
 
-If the base branch isn't `main` (stacked PR), substitute the actual base.
+```bash
+git diff <base-branch>...HEAD --stat
+git diff <base-branch>...HEAD
+```
 
 Save the full diff text. You'll pass it verbatim to each lens. If the diff is large (>500 lines), include both a one-paragraph summary and the full text so each lens has the map and the territory.
 

@@ -67,7 +67,10 @@ with a note — **do not dispatch the agent**:
 ## Dispatch the code-simplifier agent
 
 Otherwise, dispatch the **`code-simplifier`** agent provided by this plugin — one `Agent` call,
-`subagent_type: code-simplifier` (or `agentic-sdlc:code-simplifier`). It runs in a **clean
+`subagent_type: code-simplifier` (or `agentic-sdlc:code-simplifier`). **Include the resolved
+`base` from the running state in the prompt** (e.g. `base-branch: <base>`) — the agent runs in a
+clean session with no way to know the base itself, and on a stacked PR (`base` != `main`) an
+unstated base would make it diff against the wrong baseline. It runs in a **clean
 session with no attachment to the choices that produced the code**: it reads the host repo's
 invariants + constitution, captures the diff, fans out **three parallel lenses** —
 
