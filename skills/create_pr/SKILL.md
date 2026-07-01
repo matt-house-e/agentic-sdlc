@@ -1,6 +1,6 @@
 ---
+name: create_pr
 description: Create a pull request following project conventions, with correct labels and a closes-link to the issue
-accepts_args: true
 argument-hint: <issue-number-or-url> [extra context]
 ---
 

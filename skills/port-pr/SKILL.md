@@ -1,6 +1,6 @@
 ---
+name: port-pr
 description: Port a merged scope:shared PR from one servicedesk repo to its sibling — apply the diff, resolve conflicts, open a mirror PR
-accepts_args: true
 argument-hint: <source-pr-number> [<source-owner>/<source-repo>]
 ---
 
@@ -9,9 +9,9 @@ Port the merged source PR #$ARGUMENTS into the sibling repo as a new mirror PR.
 `$ARGUMENTS` is either `<source-pr-number>` or `<source-pr-number> <source-owner>/<source-repo>`.
 Parse them now: first token is the PR number, second (optional) is the explicit source repo.
 
-This command is repo-agnostic — it detects source/sibling at runtime. Run it from
+This skill is repo-agnostic — it detects source/sibling at runtime. Run it from
 the **sibling** working directory (the repo the port lands in). If the source
-repo isn't explicitly given, the command resolves it from `.agentic-sdlc/config.json`
+repo isn't explicitly given, the skill resolves it from `.agentic-sdlc/config.json`
 or falls back to a built-in mapping for the two known servicedesks.
 
 ---
@@ -153,7 +153,7 @@ make check        # or the repo's documented equivalent
 make test         # or the repo's documented equivalent
 ```
 
-In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — same gotcha as `ship_issue` step 7.
+In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — the same gotcha the `ship-work` / `ship-verify` phase-skills document.
 
 If a relevant eval framework exists (`test -d evals/`) and the source PR touched agent-observable behavior, run the matching scenarios. Don't run the full eval suite.
 
@@ -242,7 +242,7 @@ Add any missing labels with `gh pr edit <pr-number> --add-label`.
 
 ## 9. Enable auto-merge
 
-Same as `ship_issue` step 13:
+The same auto-merge plumbing the `ship_issue` orchestrator runs once the PR is open:
 
 ```bash
 gh pr merge <pr-number> --auto --squash --delete-branch
