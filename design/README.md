@@ -3,8 +3,11 @@
 > **The bet in one line:** Own the *knowledge* and your *pipeline logic*; rent the *models* and the *harness*; build only what the platform isn't already commoditising for free.
 
 These docs distill two rounds of research (8 agents, ~40 sources) into a direction
-that survives the pace of AI change. They're for **you to read, challenge, and refine** —
-not a finished spec. Every open decision is flagged 🔵.
+that survives the pace of AI change. **Phases 1-4 of the [roadmap](04-roadmap.md) are
+implemented and merged** — see the top-level `README.md`'s Status log (v0.3.0 through
+v0.6.0) — so this corpus now doubles as the record of what shipped and why, not just a
+proposal. What's left is a short list of items explicitly **deferred** (🟡 in the
+roadmap); there are no more open 🔵 decisions in the corpus.
 
 ## Read in this order
 
@@ -50,8 +53,12 @@ either already-shipped standards or premature:
 | AFK safety | Auto-mode gates interruption not blast radius → **sandbox + branch protection + credential hygiene** + risk-gated auto-merge ([doc 9](09-safety-and-runtime.md)) |
 | Context rot | **Discipline by architecture** (fresh phase contexts + hand-off), no hardcoded token limit |
 | DX + AX | Both are standing **objectives**; loop harvests AX/DX frictions too |
+| Phase sequencing | **Proceed incrementally, phase by phase** — Phases 1-4 shipped without locking the architecture doc first (🟢 in [roadmap](04-roadmap.md)) |
 
-**Still open:** start Phase 1 now, or one more design pass first? (🔵 in [roadmap](04-roadmap.md))
+**Nothing left open:** the sequencing question above was the last 🔵 decision. What
+remains is explicitly **deferred** (🟡 in [roadmap](04-roadmap.md)) — a freshness pass
+for invariants, a provider gateway, and disposable brainstorm/ideate skills — not
+undecided.
 
 **Deferred (tracked):** constitution pruning → [#4](https://github.com/matt-house-e/agentic-sdlc/issues/4)
 · per-area park-zone tuning → [#5](https://github.com/matt-house-e/agentic-sdlc/issues/5)
@@ -59,5 +66,7 @@ either already-shipped standards or premature:
 
 ## How to give feedback
 
-Mark up any doc inline, or just tell me which 🔵 decisions to resolve and which
-claims you want challenged harder. Nothing here is committed to the real plugin yet.
+Mark up any doc inline, or tell me which 🟡 deferred item to pick up next and which
+claims you want challenged harder. Phases 1-4 are already committed to the real plugin
+(see the top-level `README.md`'s Status log) — feedback here now targets what's still
+deferred, plus anything shipped that you want revisited.
