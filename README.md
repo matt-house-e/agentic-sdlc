@@ -47,7 +47,7 @@ versioned and testable (run `bash scripts/tests/run.sh`):
 |---|---|
 | `verify-pr-labels.sh <pr> <issue>` | Guarantees every source-issue label is on the PR (`gh pr create --label` aborts entirely on a missing label, so labels are applied after creation instead); exits non-zero if any is still missing |
 | `wait-for-review.sh <pr> [timeout]` | Blocks until a PR review is submitted newer than the latest commit (polls reviews, not workflow runs by SHA); prints the verdict |
-| `prune-merged-worktrees.sh [--dry-run]` | Removes `*-wt-*` worktrees whose branch is gone from origin |
+| `prune-merged-worktrees.sh [--dry-run]` | Removes `ship_issue`'s own `*-wt-*` worktrees and the harness's `.claude/worktrees/*` ones once `gh` confirms a merged PR for the branch (not ref-existence, which can't tell "merged" from "never pushed"); runs automatically at the start of every `/ship_issue` run, not just after auto-merge |
 
 **Model roles** — `MODELS.md` maps capability roles (`planner`/`implementer`/`reviewer`/`grunt`)
 to model tier aliases, so model choice is one edit and the pipeline auto-rides upgrades.

@@ -58,6 +58,14 @@ git fetch origin main
 git worktree list
 ```
 
+**Routine hygiene — sweep before creating anything new.** Stale worktrees/branches are not
+permitted to accumulate; don't rely solely on the post-auto-merge cleanup below; most runs so
+far have been merged manually, which never reaches that step:
+
+```bash
+"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"     # add --dry-run to preview
+```
+
 **Resolve the base branch non-interactively** (this runs fire-and-forget — never block on a
 prompt):
 
@@ -205,8 +213,9 @@ Report:
 - Any `parked` question (the `⚠ needs your call` line) or `failed` reason, if the run stopped early
 - Any follow-on issues to create (if scope narrowed during implementation)
 
-After auto-merge lands the PR (interactive/CI fallback path only — under Agent View the harness
-owns the worktree lifecycle):
+If auto-merge landed the PR in this same run (interactive/CI fallback path only — under Agent
+View the harness owns the worktree lifecycle), sweep immediately for faster feedback rather than
+waiting for the next run's step-0 sweep to catch it:
 
 ```bash
 "$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"     # add --dry-run to preview
