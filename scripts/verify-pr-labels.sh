@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Guarantee every label on the source issue is also on the PR.
-# WHY: `gh pr create --label X` silently no-ops when a label doesn't yet exist
-# at create time, so labels can go missing. This re-reconciles after the fact.
+# WHY: `gh pr create --label X` aborts PR creation entirely if X doesn't exist
+# in the repo, so create_pr/SKILL.md never passes --label at create time.
+# This applies (and reconciles) every label after the fact instead.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,18 +17,6 @@ usage() {
 PR="$1"
 ISSUE="$2"
 [[ "$PR" =~ ^[0-9]+$ && "$ISSUE" =~ ^[0-9]+$ ]] || { usage; exit 64; }
-
-# AI-attribution labels that may not exist in every repo; add only if present.
-AI_LABELS=("ai-tool: claude-code" "ai-workflow: ai-authored")
-STRAY_LABEL="ai-workflow: human-authored"
-
-# label_exists <name> -- true if the repo defines this label.
-# Capture-then-match (no pipe into grep) so pipefail can't misread a SIGPIPE on gh as "absent".
-label_exists() {
-  local name="$1" found
-  found="$(gh label list --search "$name" --json name --jq '.[].name' 2>/dev/null || true)"
-  grep -Fxq -- "$name" <<< "$found"
-}
 
 # Newline-separated label names for an issue or PR.
 issue_labels() { gh issue view "$ISSUE" --json labels --jq '.labels[].name'; }
@@ -45,17 +34,6 @@ if [[ -n "$missing" ]]; then
       || echo "warn: failed to add label '$label'" >&2
   done <<< "$missing"
 fi
-
-# Add AI-attribution labels only when the repo actually has them.
-for label in "${AI_LABELS[@]}"; do
-  if label_exists "$label"; then
-    gh pr edit "$PR" --add-label "$label" \
-      || echo "warn: failed to add AI label '$label'" >&2
-  fi
-done
-
-# Best-effort: drop the stray human-authored label if it slipped on.
-gh pr edit "$PR" --remove-label "$STRAY_LABEL" >/dev/null 2>&1 || true
 
 # Re-verify against the (possibly grown) issue label set.
 pr_set="$(pr_labels)"

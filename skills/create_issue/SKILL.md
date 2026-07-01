@@ -127,6 +127,18 @@ Optional:
 
 - `status:blocked` / `status:ready` — if the repo uses status labels
 
+**Before creating the issue, verify every wanted label actually exists in this repo** — not just
+`component:*` (step 3 already checks that): `gh issue create --label` aborts issue creation
+entirely if even one named label (including `type:*` / `priority:*`) is missing, the same gotcha
+as PR creation.
+
+```bash
+gh label list --json name --jq '.[].name'
+```
+
+Drop (don't invent) any wanted label that isn't in this list, and say so in your final report —
+don't silently ship the issue short a label without mentioning it.
+
 ---
 
 ## 7. Create the issue
@@ -134,7 +146,7 @@ Optional:
 ```bash
 gh issue create \
   --title "<title>" \
-  --label "type:X,priority:Y,component:Z" \
+  --label "<only the type:*/priority:*/component:* labels confirmed to exist>" \
   --body "$(cat <<'EOF'
 <full body>
 EOF

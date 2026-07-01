@@ -190,16 +190,9 @@ Do **not** add `Closes #X` — the issue (if any) lives in the source repo.
 ```bash
 git push -u origin "$BRANCH"
 
-# Build label list:
-# - Always: scope:shared (this is a port; future humans need to see that)
-# - Always: ai-tool: claude-code, ai-workflow: ai-authored
-# - Carry over any type:* / priority:* / component:* from the source PR if the
-#   sibling repo has identically-named labels (check `gh label list` first)
-
 gh pr create \
   --title "${SOURCE_TITLE} (ports #${PR})" \
   --base main \
-  --label "scope:shared,ai-tool: claude-code,ai-workflow: ai-authored,<carried-over>" \
   --body "$(cat <<EOF
 ## Summary
 
@@ -230,13 +223,20 @@ EOF
 )"
 ```
 
-**Verify labels landed** the same way `ship_issue` does — `gh pr create --label` silently no-ops on missing labels:
+**Apply labels afterward, not at creation time** — `gh pr create --label` aborts creation entirely
+if even one named label doesn't exist in the sibling repo. Build the wanted list (always
+`scope:shared`; carry over any `type:*` / `priority:*` / `component:*` from the source PR) and add
+only the ones the sibling repo actually has:
 
 ```bash
-gh pr view <pr-number> --json labels --jq '.labels[].name'
+PR_NUMBER=<created-pr-number>
+SIBLING_LABELS=$(gh label list --json name --jq '.[].name')
+WANT_LABELS=$'scope:shared\n<carried-over type:*/priority:*/component:* from the source PR, one per line>'
+while IFS= read -r label; do
+  [[ -z "$label" ]] && continue
+  grep -qxF -- "$label" <<< "$SIBLING_LABELS" && gh pr edit "$PR_NUMBER" --add-label "$label"
+done <<< "$WANT_LABELS"
 ```
-
-Add any missing labels with `gh pr edit <pr-number> --add-label`.
 
 ---
 

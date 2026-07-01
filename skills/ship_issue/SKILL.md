@@ -146,9 +146,9 @@ EXISTING=$(gh pr list --head <branch> --state open --json number --jq '.[0].numb
 # if EXISTING is set, reuse it (set state.pr = $EXISTING) and skip creation; else create below.
 ```
 
-Build the label list **before** creating the PR so it can't ship without them, resolve the
-`scope:*` label (config `.agentic-sdlc/config.json` → built-in fallback → never prompt to
-upgrade), create the PR with labels inline, then **hard-gate** on label verification:
+Resolve the `scope:*` label (config `.agentic-sdlc/config.json` → built-in fallback → never
+prompt to upgrade), create the PR **without** `--label` (a missing label aborts creation
+entirely), then **hard-gate** on label reconciliation:
 
 ```bash
 PR_NUMBER=<pr-number>; ISSUE_NUMBER=<source-issue-number>

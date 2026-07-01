@@ -58,8 +58,13 @@ Map `type:*` → commit type:
 | `type:story` | `feat` |
 | `type:task` | `chore` (or `refactor` / `perf` / `test` if more specific) |
 | `type:bug` | `fix` |
-| `type:spike` | `spike` |
+| `type:spike` | `chore` |
 | `type:epic` | `feat` |
+
+`spike` is not a Conventional Commits type — mapping it to a real one (`chore`) keeps the final
+commit from being rejected by any repo that lints commit messages against the standard CC type
+set. The branch prefix (`spike/`) still carries the spike semantics; the commit type doesn't need
+to.
 
 Map `component:*` → scope. Use whichever component label the repo actually has — `component:ci` and `component:ci-cd` are both valid; don't invent. Common mappings:
 
@@ -91,27 +96,12 @@ Keep titles under 70 characters. Body carries the detail.
 
 ## 3. Labels to apply
 
-**Required labels on every AI-authored PR:**
+Copy every `type:*`, `priority:*`, `component:*` label that's on the source issue, verbatim.
 
-1. Every `type:*`, `priority:*`, `component:*` label that's on the source issue — copy verbatim.
-2. `ai-tool: claude-code`
-3. `ai-workflow: ai-authored`
-
-Build and pass them at PR-creation time:
-
-```bash
-ISSUE_LABELS=$(gh issue view <issue-number> --json labels --jq '[.labels[].name] | join(",")')
-AI_LABELS="ai-tool: claude-code,ai-workflow: ai-authored"
-PR_LABELS="${ISSUE_LABELS},${AI_LABELS}"
-```
-
-`gh pr create --label` silently no-ops on labels the repo doesn't have — verify after creation with `gh pr view <pr> --json labels`.
-
-If the repo auto-applied `ai-workflow: human-authored` from an org-level workflow, remove it:
-
-```bash
-gh pr edit <pr-number> --remove-label "ai-workflow: human-authored" 2>/dev/null || true
-```
+**`gh pr create --label` does not silently skip a label the repo doesn't have — it aborts PR
+creation entirely** if even one named label is missing, which would otherwise turn a cosmetic
+labeling gap into a failed ship. So don't pass `--label` at creation time at all — step 4 creates
+the PR bare, and step 5 applies every label afterward via the plugin's reconciliation script.
 
 ---
 
@@ -120,7 +110,6 @@ gh pr edit <pr-number> --remove-label "ai-workflow: human-authored" 2>/dev/null 
 ```bash
 gh pr create \
   --title "<type>(<scope>): <description> (#<issue-number>)" \
-  --label "$PR_LABELS" \
   --body "$(cat <<'EOF'
 ## Summary
 [1-2 sentences: what this PR does and why]
@@ -136,7 +125,7 @@ gh pr create \
 - [ ] Lint passes
 - [ ] Tests pass
 - [ ] Relevant evals pass — or skip-rationale documented
-- [ ] Labels copied from source issue + `ai-tool: claude-code` + `ai-workflow: ai-authored`
+- [ ] Labels copied from source issue
 - [ ] Self-reviewed
 - [ ] ADR created if architectural decision made
 - [ ] `CLAUDE.md` updated if architecture changed
@@ -150,13 +139,13 @@ If the PR is based on a non-`main` branch (stacked PR), add `--base <base-branch
 
 ---
 
-## 5. Verify labels landed
+## 5. Apply and verify labels
 
 ```bash
-gh pr view <pr-number> --json labels --jq '.labels[].name'
+"$CLAUDE_PLUGIN_ROOT/scripts/verify-pr-labels.sh" <pr-number> <issue-number>
 ```
 
-The output must include every label from `$ISSUE_LABELS` plus `ai-tool: claude-code` and `ai-workflow: ai-authored`. If anything is missing, add it with `gh pr edit <pr> --add-label "<name>"` before continuing. Downstream dashboards and auto-reviewers depend on these.
+Don't proceed past a non-zero exit — it means an issue label couldn't be reconciled onto the PR.
 
 ---
 
@@ -172,6 +161,6 @@ The output must include every label from `$ISSUE_LABELS` plus `ai-tool: claude-c
 
 - Don't open a PR without `Closes #<issue>` — every PR closes its issue
 - Don't open a PR with red lint or tests — fix first
-- Don't skip the AI-attribution labels — dashboards depend on them
+- Don't pass `--label` to `gh pr create` — a repo missing even one named label aborts creation entirely; apply labels afterward via `verify-pr-labels.sh` instead
 - Don't invent labels — use the ones the repo already has (`gh label list`)
 - Don't squash the commits into one before opening the PR — let GitHub squash on merge; the per-task commits are the implementation log
