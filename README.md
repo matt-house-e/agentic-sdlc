@@ -14,6 +14,7 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 | `/create_branch <n>` | Creates a feature branch from an issue, with the right type prefix and a derived slug |
 | `/create_pr <n>` | Opens a PR linked to issue `#n` with correct labels and a `Closes #n` link |
 | `/port-pr <n>` | Ports a merged `scope:shared` PR from one repo into its sibling — applies the diff, resolves conflicts, opens a mirror PR with `Mirrors <owner>/<repo>#<n>` in the body |
+| `/ce-debug <ref>` | Systematic bug diagnosis — traces the full causal chain before fixing, test-first. **Vendored** (pinned) from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin); see `skills/ce-debug/VENDORED.md`. Also runs non-interactively inside `/ship_issue` when `work`/`verify` hit a failure they can't explain |
 
 **Phase-skills** (in `skills/ship-*/`) — the six stages `/ship_issue` runs in order, each in a
 **fresh, isolated context** (`context: fork`) that hands a small JSON envelope back to the
@@ -144,6 +145,7 @@ A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scop
 
 ## Status
 
+- v0.6.0 — Phase 4: vendored a pinned `ce-debug` diagnosis skill (MIT, EveryInc/compound-engineering-plugin @ `compound-engineering-v3.16.0`) — fills the root-causing gap; adapted to our conventions (dual interactive/non-interactive modes, no branch creation, hands off to `create_pr`/`ship_issue`); wired into `work`/`verify` so an unexplained failure escalates to structured diagnosis before parking
 - v0.5.0 — Phase 3: decomposed `/ship_issue` into six isolated `SKILL.md` phase-skills (`ship-plan/work/simplify/verify/review/learn`) behind a **state-envelope contract** (`skills/ship_issue/CONTRACT.md`); `/ship_issue` is now a thin orchestrator; migrated all `commands/` to the portable `skills/` format
 - v0.4.0 — Phase 2: two-tier knowledge model (`KNOWLEDGE.md`) — invariants (enforced) + constitution (justify-or-deviate); installable `templates/constitution.md`; compounding loop central-judges findings + admission bar + tier routing; `code-simplifier` reads the constitution
 - v0.3.0 — Phase 1: `ship_issue` stops owning isolation (detect-and-skip) + runs non-interactively; load-bearing bash extracted to tested `scripts/`; model roles in `MODELS.md`

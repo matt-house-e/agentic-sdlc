@@ -160,8 +160,18 @@ choices go in `decisions`:
   "parked": null }
 ```
 
-- `status: "failed"` — tests fail in a way you can't resolve. **Push the branch first** so the
-  findings are on origin, then report what's red in `notes`.
+- **A failure you don't understand → escalate to `ce-debug` before failing.** When a test
+  fails for a reason you can't explain (not a quick reading-the-code fix), invoke the diagnosis
+  protocol non-interactively: `Skill(ce-debug, "<the failing test + error + relevant state>  mode: pipeline")`.
+  It investigates, root-causes, and — under **proceed-by-default** — applies a minimal test-first
+  fix when that fix is safe and reversible. If it resolves the failure, re-run the gates and continue.
+  Otherwise route its outcome **by kind**:
+  - **Design-problem park** (ce-debug found the root cause is a design question for the human) →
+    return `status: "parked"` with that question as `parked.question` — *not* `failed`.
+  - **Unresolved red gate** (ce-debug couldn't root-cause-and-fix it) → `status: "failed"`.
+- On `failed`: **push the branch first** so the findings are on origin; write `ce-debug`'s
+  structured Debug Summary into the **draft PR/issue** (not the envelope), and keep `notes` a
+  one-line pointer to it.
 - `status: "parked"` with `parked: {question, options}` — only for a genuine mid-flight blocker
   that needs the human (e.g. implementation forces a product/UX call the plan didn't settle).
   Don't park for anything you can resolve by reading code or applying the documented pattern.

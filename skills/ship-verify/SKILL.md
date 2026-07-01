@@ -93,8 +93,16 @@ record it in `decisions` ({choice, why, rejected}) — never a silent edit.
 Fix everything that fails before returning `ok`. If you change implementation to make a gate pass,
 re-run the affected gate. Do not move on with a red check.
 
-**Return `failed` on any red gate you couldn't fix.** Do not let the pipeline open a PR on red —
-that is the one thing this phase exists to prevent.
+**A red gate you can't explain → escalate to `ce-debug` before failing.** When a test/eval fails
+for a reason you can't root-cause by reading the diff, invoke the diagnosis protocol
+non-interactively: `Skill(ce-debug, "<the failing gate + output + relevant state>  mode: pipeline")`.
+It traces the causal chain and, under **proceed-by-default**, applies a minimal test-first fix when
+that fix is safe and reversible (re-run the gate after); it **parks** for a design problem or a
+behaviour-changing prompt/eval edit. The fix earns no special path — it is "done" only when this
+phase's gates are green.
+
+**Return `failed` on any red gate `ce-debug` couldn't resolve** (or that it parked). Do not let the
+pipeline open a PR on red — that is the one thing this phase exists to prevent.
 
 ## Return
 
