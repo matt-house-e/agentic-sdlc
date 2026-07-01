@@ -58,8 +58,13 @@ Map `type:*` → commit type:
 | `type:story` | `feat` |
 | `type:task` | `chore` (or `refactor` / `perf` / `test` if more specific) |
 | `type:bug` | `fix` |
-| `type:spike` | `spike` |
+| `type:spike` | `chore` |
 | `type:epic` | `feat` |
+
+`spike` is not a Conventional Commits type — mapping it to a real one (`chore`) keeps the final
+commit from being rejected by any repo that lints commit messages against the standard CC type
+set. The branch prefix (`spike/`) still carries the spike semantics; the commit type doesn't need
+to.
 
 Map `component:*` → scope. Use whichever component label the repo actually has — `component:ci` and `component:ci-cd` are both valid; don't invent. Common mappings:
 
