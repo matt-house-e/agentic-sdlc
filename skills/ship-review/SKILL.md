@@ -86,8 +86,7 @@ each fix is its own logical commit.
 - If architecture changed: `CLAUDE.md` and/or an ADR is updated.
 - The PR description accurately describes the change.
 - PR labels are correct: `type:*` / `priority:*` / `component:*` copied from the source issue,
-  plus `ai-tool: claude-code` and `ai-workflow: ai-authored`, plus **exactly one** `scope:*` label;
-  no stray `ai-workflow: human-authored` left from org defaults.
+  plus **exactly one** `scope:*` label.
 
 ## Drift tripwire (anti-drift rule 3)
 

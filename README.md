@@ -45,7 +45,7 @@ versioned and testable (run `bash scripts/tests/run.sh`):
 
 | Script | What it does |
 |---|---|
-| `verify-pr-labels.sh <pr> <issue>` | Guarantees every source-issue label is on the PR (the `gh ... --label` silent-no-op gotcha); exits non-zero if any is still missing |
+| `verify-pr-labels.sh <pr> <issue>` | Guarantees every source-issue label is on the PR (`gh pr create --label` aborts entirely on a missing label, so labels are applied after creation instead); exits non-zero if any is still missing |
 | `wait-for-review.sh <pr> [timeout]` | Blocks until a PR review is submitted newer than the latest commit (polls reviews, not workflow runs by SHA); prints the verdict |
 | `prune-merged-worktrees.sh [--dry-run]` | Removes `*-wt-*` worktrees whose branch is gone from origin |
 
