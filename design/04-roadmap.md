@@ -62,5 +62,6 @@
 **Cycle time · change-fail/rework rate · escaped defects.** Not LoC, PR count, or
 % AI-written. If churn rises, the system is generating slop — stop and fix the loop.
 
-🔵 **Decision:** Start Phase 1 now, or lock the architecture doc first and react before
-any code moves?
+🟢 **Resolved:** proceed incrementally, phase by phase, without locking the architecture
+doc first. That's what happened — Phases 1-4 above have since shipped and merged (see
+the top-level `README.md`'s Status log, v0.3.0 through v0.6.0).
