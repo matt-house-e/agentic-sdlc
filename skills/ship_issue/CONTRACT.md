@@ -185,3 +185,13 @@ recovers the *why* by re-reading — no transcript required:
   only `review` on a cheaper tier) needs dedicated per-tier agent types in `agents/` and is **not
   yet wired** — tracked as a follow-up. Today, tiering for the read-heavy forks = the tier you
   launch the run at.
+- **A phase's own nested `Agent` dispatches run in the foreground.** When a phase fork dispatches
+  an `Agent` call *for its own use* (work's implementer subagent, simplify's code-simplifier),
+  that call must use `run_in_background: false`. The fork is the caller waiting on the result,
+  not the orchestrator background-tracking a job — it has nothing else to interleave while the
+  subagent runs. Backgrounding it lets the fork's turn end on an interim status line before the
+  subagent's real result exists; the orchestrator then receives that stray text as the phase's
+  "envelope," fails to parse it, and re-invokes per the malformed-envelope retry protocol above —
+  dispatching a *second* subagent against the same working tree while the first one is still
+  running. That protocol assumes "bad response = phase failed to produce output," which only
+  holds if phases never background their own nested dispatches.
