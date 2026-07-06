@@ -83,6 +83,15 @@ invariants + constitution, captures the diff, fans out **three parallel lenses**
 returns a terse report (files touched / removals / skipped / verification). Let it do the
 editing; your job is to vet the result against the drift map and seal it.
 
+**Dispatch that `Agent` call with `run_in_background: false`.** This fork is the code-simplifier's
+caller, not the orchestrator tracking a background job — it has no other work to interleave
+while the subagent runs, so it must block until the subagent's real result comes back. If the
+call is left to background by default, this fork's turn ends with an interim status line
+before the subagent's actual result exists, and that stray text is what the orchestrator
+receives as the phase's envelope — malformed, and indistinguishable from a phase that never
+ran. **Your final message must always be the one JSON envelope below, never an interim status
+line.**
+
 ## Drift tripwire (anti-drift rule 3 — critical for simplify)
 
 Simplify is the one read-heavy phase that **edits code**, so the tripwire matters most here.
