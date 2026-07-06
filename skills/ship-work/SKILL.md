@@ -80,6 +80,15 @@ The subagent has **no session memory**, so its prompt must be self-contained and
 - **The ask**: *implement and commit every task in order, then return a one-paragraph summary
   of what changed and any task-plan corrections you had to make.*
 
+**Dispatch that `Agent` call with `run_in_background: false`.** This fork is the implementer's
+caller, not the orchestrator tracking a background job — it has no other work to interleave
+while the subagent runs, so it must block until the subagent's real result comes back. If the
+call is left to background by default, this fork's turn ends with an interim status line
+(e.g. "I'll wait for the notification...") *before* the subagent's actual result exists, and
+that stray text is what the orchestrator receives as the phase's envelope — malformed, and
+indistinguishable from a phase that never ran. **Your final message must always be the one
+JSON envelope below, never an interim status line.**
+
 When the subagent returns, resume here to assemble the envelope.
 
 ## Per-task loop
