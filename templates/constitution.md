@@ -33,6 +33,14 @@ you'd never actually enforce. A seed you don't trim is bloat.
 - Fix what you touch; don't gold-plate what you don't.
 - Prefer reversible changes; gate irreversible ones behind explicit review.
 
+## Operational safety
+
+- Shipping is not deploying: a merged PR never authorizes a production deployment — that takes an explicit human grant and the repo's standard release process.
+- Backfills and bulk production-data operations are separate, explicitly-approved work — never coupled to a feature's first rollout.
+- Prove one thin end-to-end slice of the user journey before building horizontal breadth.
+- Anything touching queues, bulk data, or external systems answers volume, cost, failure behavior, starvation, kill switch, and rollback before implementation.
+- Close an issue only when its acceptance criteria are met; if scope changed, record the change on the issue first.
+
 ## AI-assisted work
 
 - Plan before code on anything non-trivial; skip the plan only for one-shot diffs.
