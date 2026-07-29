@@ -15,7 +15,7 @@ Find root causes, then fix them. This skill investigates bugs systematically —
 This skill runs in one of two modes. Detect which you are in before Phase 0:
 
 - **Interactive** (a human typed `/ce-debug …`): debugging is an interactive surface — you **may** ask blocking questions at the decision points below, and after a fix you offer next steps. This is the default when invoked directly.
-- **Non-interactive** (invoked by the `/ship_issue` pipeline, headless, or fire-and-forget — you were handed a running-state envelope or a `mode: pipeline` signal): **never ask a blocking question.** Apply the host's **proceed-by-default, park-by-exception** rule instead, and hand your result back to the caller (do not open a PR — the orchestrator owns that). Concretely, at every point below that says "ask the user," substitute the **non-interactive default** noted there.
+- **Non-interactive** (invoked by the `/ship_issue` harness, headless, or fire-and-forget — you were handed run context or a `mode: pipeline` signal): **never ask a blocking question.** Apply the host's **proceed-by-default, park-by-exception** rule instead, and hand your result back to the caller (do not open a PR — the caller owns that). Concretely, at every point below that says "ask the user," substitute the **non-interactive default** noted there.
 
 **Isolation is the harness's job — in both modes.** This skill **never creates a worktree or branch.** It operates in the current working directory; the harness (or the `ship_issue` orchestrator) has already placed you in the right isolated workspace.
 

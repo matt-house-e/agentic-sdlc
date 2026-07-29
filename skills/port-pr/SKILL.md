@@ -153,7 +153,7 @@ make check        # or the repo's documented equivalent
 make test         # or the repo's documented equivalent
 ```
 
-In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — the same gotcha the `ship-work` / `ship-verify` phase-skills document.
+In a worktree, prefix Python tests with `PYTHONPATH=$PWD` if the parent shell exports one — the same gotcha the `/ship_issue` harness documents.
 
 If a relevant eval framework exists (`test -d evals/`) and the source PR touched agent-observable behavior, run the matching scenarios. Don't run the full eval suite.
 

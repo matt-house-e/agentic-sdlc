@@ -1,234 +1,286 @@
 ---
 name: ship_issue
-description: Ship a GitHub issue end-to-end in an isolated worktree — plan, implement, simplify, verify, PR, self-review, compounding loop, auto-merge. Thin orchestrator over six isolated phase-skills behind a state-envelope contract.
-argument-hint: <issue-number> [base-branch]
+description: Ship a GitHub issue end-to-end in one coherent context — pre-flight risk read, implement with focused tests, one authoritative gate, risk-gated independent review, PR, auto-merge, run record. A harness of hard gates around a free agent.
+argument-hint: <issue-number> [base-branch] [full]
 ---
 
 Ship issue #$ARGUMENTS from first read to merged PR.
 
-`$ARGUMENTS` is `<issue-number>` or `<issue-number> <base-branch>`. Parse now: first token
-is the issue number, second (optional) token is the explicit base branch.
+`$ARGUMENTS` is `<issue-number>`, optionally followed by `<base-branch>`, optionally followed
+by the literal word `full`. Parse now: first token = issue number; a token matching an existing
+branch name = explicit base; the token `full` = force maximum rigor (posted plan + independent
+review) regardless of signals.
 
-You are the **orchestrator**. You own plumbing and sequencing; you own **no reasoning** —
-that lives in six isolated phase-skills you invoke in order. Read
-`${CLAUDE_SKILL_DIR}/CONTRACT.md` now — it is the authoritative state-envelope contract and
-this skill assumes it.
-
-The pipeline:
-
-```
-plan → work → simplify → verify → [open PR] → review → learn → [auto-merge]
-```
-
-Each phase runs in a fresh isolated context (`context: fork`) and returns a small JSON
-**envelope**. You thread accumulated **state** forward and branch only on `status`.
+You run the **whole issue in one coherent context**. There is no phase pipeline: you read the
+issue, assess risk, plan at the depth the risk demands, implement, gate, ship. What replaces
+the pipeline is a set of **hard rules and gates you cannot skip or reorder** — everything else
+(how you plan, when you delegate, what you read) is your judgment. See
+`design/10-harness.md` for why.
 
 ---
 
-## How you run a phase
+## Hard rules (authority boundaries — no judgment, no exceptions)
 
-For each phase below, invoke the phase-skill via the **Skill tool**, passing the current
-running state as a JSON object string in the arguments:
-
-```
-Skill(ship-plan, "<running-state-json>")
-```
-
-The phase forks, does its work in isolation, and returns its envelope as its final message.
-Then:
-
-1. **Validate** the envelope: valid JSON, known `status`, `state` present. If malformed,
-   re-invoke once asking for the envelope only; if it fails again, treat as `failed`.
-2. Branch on `status`:
-   - **`ok`** → merge `state` into the running state (overwrite keys), append `decisions`
-     to the run's decision log, proceed to the next phase.
-   - **`parked`** → **stop.** Record `parked.question` for the digest. Leave branch/PR in place.
-   - **`failed`** → **stop.** Record `notes`. Leave any branch/PR as a draft with findings.
-
-Never force past a `parked` or `failed`. The phases re-ground on the durable substrate, so a
-small envelope is safe — do not try to forward transcripts.
+1. **Shipping is not deploying.** Merging a PR never authorizes a production deployment.
+   Never trigger a production deploy, release tag, or deploy workflow unless the user has
+   explicitly granted it *for this run* — quote the grant verbatim in the run record. The
+   repo's standard tagged-release process is never bypassed, even with a grant.
+2. **No backfills or bulk mutations of production data.** Historical/bulk processing is
+   always a separate, explicitly-approved issue — never coupled to a feature's first rollout.
+   If this issue's spec includes one, split it out (park if the issue insists they ship
+   together).
+3. **No at-scale writes to external systems** (ticket systems, email, third-party APIs)
+   beyond what the acceptance criteria explicitly require and tests cover.
+4. **Never open a PR on a red gate. Never merge past a red check.** No `--admin`, no
+   force-push to shared branches, no editing CI config to make a failure pass.
+5. **Closure integrity.** `Closes #n` requires the issue's acceptance criteria to be met. If
+   implementation legitimately diverged, record a scope-change comment on the issue *before*
+   the PR merges — or open a replacement issue and reference it instead.
+6. **Selected checks stay selected.** If the user asked for specific checks, state the set
+   and reason before running, and do not expand it unasked.
 
 ---
 
-## 0. Initialize the running state
+## 0. Hygiene and workspace (plumbing)
 
 ```bash
-gh issue view <issue-number> --comments     # confirm the issue exists and read it once
+gh issue view <issue-number> --comments     # read the issue ONCE, fully — spec + prior decisions
 git fetch origin main
 git worktree list
+"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"     # routine sweep; --dry-run to preview
 ```
 
-**Routine hygiene — sweep before creating anything new.** Stale worktrees/branches are not
-permitted to accumulate; don't rely solely on the post-auto-merge cleanup below; most runs so
-far have been merged manually, which never reaches that step:
+**Resolve the base non-interactively:** explicit base arg → use it (check `git ls-remote
+origin <base>`; if missing, log a one-line warning and proceed — the PR diff includes its
+commits until it merges). Otherwise `origin/main`. If the issue clearly stacks on an in-flight
+branch you can't identify, **park** — don't guess.
+
+**Isolation — detect first, create only if needed:**
 
 ```bash
-"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"     # add --dry-run to preview
+if [ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ]; then ISOLATED=1; else ISOLATED=0; fi
 ```
 
-**Resolve the base branch non-interactively** (this runs fire-and-forget — never block on a
-prompt):
-
-1. **Explicit base** (second arg): use it. Check it's on origin (`git ls-remote origin <base>`);
-   if missing, log a one-line warning and proceed (the PR diff includes its commits until it merges).
-2. **No explicit base**: use `origin/main`.
-
-If a genuine base ambiguity exists that you couldn't resolve upfront (e.g. this issue clearly
-stacks on an in-flight branch you can't identify), treat it as a scoping miss and **stop with a
-`parked` digest line** — don't guess silently. Pass the base as the second arg to avoid this.
-
-**Workspace setup — isolation is the harness's job. Detect first, create only if needed:**
-
-```bash
-# A linked worktree has a separate git dir from the main checkout.
-if [ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ]; then
-  ISOLATED=1   # Agent View / --bg --worktree already isolated us — use it as-is
-else
-  ISOLATED=0   # main checkout (interactive / CI fallback)
-fi
-```
-
-- **`ISOLATED=1`**: do **not** create a worktree. Ensure a dedicated branch — if still on the
+- `ISOLATED=1` (Agent View / `--bg --worktree`): do **not** create a worktree. If still on the
   default branch, `git switch -c <type>/<issue-number>-<slug> <resolved-base>`; else use the
-  current branch. Stay put.
-- **`ISOLATED=0`**: create the fallback worktree and switch into it:
+  current branch.
+- `ISOLATED=0`: create the fallback worktree and work there:
   ```bash
   REPO_SHORT=$(basename "$(git rev-parse --show-toplevel)")
   git worktree add ../${REPO_SHORT}-wt-<issue-number> -b <type>/<issue-number>-<slug> <resolved-base>
   ```
 
-Derive `<type>` from issue labels (type:story→feat, type:task→task, type:bug→fix,
-type:spike→spike, type:epic→epic) and `<slug>` from the title (lowercase, hyphens, ~40 chars).
-
-Seed the running state:
-
-```json
-{ "issue": <n>, "base": "<resolved-base>", "branch": "<branch>", "worktree": "<abs-path>",
-  "scope_label": null, "pr": null }
-```
-
-**Docker conflict risk**: if the repo's tests use shared ports and multiple worktrees are
-active, stagger test runs.
+`<type>` from labels (type:story→feat, type:task→task, type:bug→fix, type:spike→spike,
+type:epic→epic); `<slug>` from the title (lowercase, hyphens, ~40 chars).
 
 ---
 
-## 1. plan  →  `Skill(ship-plan, <state>)`
+## 1. Pre-flight — the risk read (before any code)
 
-Understands the issue, sketches + self-grills the approach, breaks it into atomic tasks, runs
-a fresh-Claude plan stress-test, and **writes the approach + decisions as a comment on the
-issue**. Returns the task plan's existence (in the issue) via `notes`; `decisions` carries the
-key calls. Parks if the issue is genuinely ambiguous (vague AC, unresolved design fork).
+Walk this signal list against the issue and the code it will touch. Deterministic: a signal
+either fires or it doesn't, and you record which. Signals **arm safeguards**; nothing can
+disarm a triggered safeguard mid-run (judgment escalates, never de-escalates).
 
-Skip nothing here for non-trivial issues. For a trivial `type:task`/`type:bug` touching ≤3
-files, `ship-plan` self-determines there is nothing to grill and returns a minimal plan fast.
+| # | Signal |
+|---|---|
+| S1 | DB schema change or migration |
+| S2 | Auth, permissions, secrets, or security-sensitive surface |
+| S3 | New dependency, or a new architectural pattern |
+| S4 | LLM behavior: prompts, evals, model selection, structured-output contracts |
+| S5 | Queues, background workers, or scheduled/async processing |
+| S6 | Bulk or historical data processing (backfills — see hard rule 2) |
+| S7 | Writes to external systems (ticketing, email, third-party APIs) |
+| S8 | Touches production data, or changes what production persists |
+| S9 | Spans multiple components / an end-to-end user journey |
+| S10 | Deployment, infra, or CI/CD config change |
+| S11 | Acceptance criteria ambiguous, or an unresolved design fork → **park now** |
 
-## 2. work  →  `Skill(ship-work, <state>)`
+**What arms what:**
 
-Implements the task plan one task at a time — single-threaded, full context, delegating the
-token-heavy loop to an implementer-tier subagent. Lints + tests each task, commits one logical
-commit per task with the **why** in the body. If the plan proves wrong mid-flight, it corrects
-the plan rather than patching over it. Returns the commit SHAs in `decisions`/`state`.
+- **Any signal fired (or `full` requested)** → the plan is **posted as an issue comment**
+  (approach, task list, key decisions *with rejected alternatives*) before implementation, and
+  the **independent review** (step 5) is armed. For genuinely hard designs, also stress-test
+  the plan with one fresh subagent (`Agent`, `general-purpose`, self-contained prompt,
+  foreground) asking *"would you ship this plan — what's wrong or missing?"*.
+- **S5–S8** → the posted plan must additionally answer the **operational questions**: expected
+  volume (how many records/requests, measured not guessed), cost (which model/API, worst
+  case), failure behavior (timeout, permanent failure, is the primary user path fail-open?),
+  starvation (can bulk work delay live work?), kill switch, rollback. If you cannot answer one
+  from the repo or the issue, **park with the question** — these are exactly the questions
+  that caused a real production incident when skipped.
+- **S9** → **tracer bullet first**: the first slice implements the thinnest complete user
+  journey end-to-end; horizontal breadth (storage layers, worker fleets, delivery machinery)
+  comes only after the journey is proven. If the issue is structured as horizontal component
+  slices, park and propose re-slicing.
+- **No signal fired** → a concise inline plan (your task list; the *why* goes in commit
+  bodies) is sufficient, and review is skipped **with the reason recorded in the run record**.
 
-## 3. simplify  →  `Skill(ship-simplify, <state>)`
+**Park (stop, ask, leave the branch in place) when:** S11 fires; the issue is really two
+issues; implementation would touch >8 files (split signal); or a hard rule conflicts with the
+spec. Parking is the design working, not a failure.
 
-Dispatches the `code-simplifier` agent (clean session, three lenses), applies its changes,
-re-runs lint + tests, commits the cleanup separately. Skips cleanly if the diff is trivial
-(≤20 lines). Read-only-ish: it must honor the **drift tripwire** — never undo a guard a
-recorded decision added without a reconciliation note.
+---
 
-## 4. verify  →  `Skill(ship-verify, <state>)`
+## 2. Implement — one coherent context
 
-Runs the deterministic gates: lint **and** format-check (both — green lint ≠ green format),
-tests, and filtered evals for behavior changes. **The eval is the spec.** Returns `failed` on
-any red gate — do not open a PR on red.
+Read the host repo's `AGENTS.md`/`CLAUDE.md` (invariants are **binding**; constitution is
+justify-or-deviate) and the files the change touches. **Lift and adapt existing patterns —
+don't invent new ones when one fits.**
 
-## 5. Open the PR (orchestrator plumbing — no phase)
+Work your task list in order. Per task:
 
-Only after `verify` returns `ok`. If `<base>` ≠ `origin/main`, pass `--base <base>`.
+1. Implement it.
+2. **Focused feedback only** — run the tests covering what you changed (not the full suite;
+   the gate owns that). Lint if quick. New behavior gets a paired test in the same commit;
+   behavior visible to evals (`test -d evals/`) gets the eval written **first**, failing, then
+   made green.
+3. **One logical commit per task**, conventional format, the **WHY in the body** — the commit
+   history is the durable design log, and a diff never records *why this and not the obvious
+   alternative*. `Closes #<issue>` on the final commit only. Never squash.
 
-**Idempotency first — never double-open.** A fire-and-forget run can crash and resume; check for
-an existing PR on the branch before creating one:
+If implementation proves the plan wrong — **stop, correct the plan** (update the posted plan
+comment if one exists), then re-implement cleanly. The plan is malleable; the spec (acceptance
+criteria) is immutable — never silently widen or narrow scope (hard rule 5).
+
+**Delegation is a tool, not a stage.** For a token-heavy loop, dispatch **one**
+implementer-tier subagent (`Agent`, `general-purpose`, `model: sonnet` per `MODELS.md`) with a
+self-contained prompt (task list, binding invariants, worktree path, the per-task protocol
+above). Single-threaded always — never parallel writers. For a large diff that smells
+over-built, dispatch `code-simplifier` and vet its edits against your recorded decisions
+before committing. **Every nested `Agent` dispatch runs in the foreground**
+(`run_in_background: false`) — you are the caller waiting on the result; a backgrounded
+dispatch ends your turn on an interim status line.
+
+**A failure you can't explain → `ce-debug` before giving up:**
+`Skill(ce-debug, "<failing test/gate + output + context>  mode: pipeline")`. If it
+root-causes and safely fixes, re-run and continue; a design-problem finding → park with the
+question; an unresolved red → stop, push the branch, record the Debug Summary in the draft PR.
+
+**PYTHONPATH gotcha (worktree):** with a parent-shell `PYTHONPATH` set, prefix Python test
+runs with `PYTHONPATH=<worktree-abs-path>` (or `export PYTHONPATH=$PWD` once) — otherwise
+`app.*` imports silently resolve to stale parent-checkout code and produce bogus failures.
+
+---
+
+## 3. THE GATE — one authoritative verification
+
+Run **once, after the final code change**. Any commit made after a green gate — review fixes,
+harvested knowledge, anything — **re-arms it** (for a provably docs-only diff, lint + format
+alone may satisfy the re-run; record that call in the run record).
+
+1. **Lint AND format** — both, always; green lint does not imply green format. `make check`,
+   or explicitly: `uv run ruff check . && uv run ruff format --check .` (Python) /
+   `npm run lint && npm run format:check` (JS/TS) / the repo's documented pair.
+2. **Tests** — the full documented suite: `make test` / `uv run pytest tests/` / `npm test`.
+3. **Evals, filtered** — only if `evals/` exists and behavior changed: `make eval
+   RUN=<prefix>` scoped to the changed behavior — never the full suite. **The eval is the
+   spec**: a failing scenario means fix the implementation; changing an eval is a deliberate,
+   recorded decision, never a silent edit.
+
+**Fail closed.** A red you can't fix (after `ce-debug`) stops the run: push the branch, open a
+**draft** PR with the findings, report. No PR opens on red (hard rule 4).
+
+---
+
+## 4. Open the PR (plumbing)
+
+**Idempotent — never double-open:**
 
 ```bash
 EXISTING=$(gh pr list --head <branch> --state open --json number --jq '.[0].number')
-# if EXISTING is set, reuse it (set state.pr = $EXISTING) and skip creation; else create below.
 ```
 
-Resolve the `scope:*` label (config `.agentic-sdlc/config.json` → built-in fallback → never
-prompt to upgrade), create the PR **without** `--label` (a missing label aborts creation
-entirely), then **hard-gate** on label reconciliation:
+Reuse `EXISTING` if set. Else create — base `<resolved-base>` if ≠ `origin/main`; body from
+the `create_pr` skill's template **plus a `## Decisions` section** (the run's key calls with
+rejected alternatives). Resolve the `scope:*` label (`.agentic-sdlc/config.json` → built-in
+fallback → never prompt), create **without** `--label`, then hard-gate:
 
 ```bash
-PR_NUMBER=<pr-number>; ISSUE_NUMBER=<source-issue-number>
-"$CLAUDE_PLUGIN_ROOT/scripts/verify-pr-labels.sh" "$PR_NUMBER" "$ISSUE_NUMBER"   # exits non-zero if any required label is missing
+"$CLAUDE_PLUGIN_ROOT/scripts/verify-pr-labels.sh" "$PR_NUMBER" "$ISSUE_NUMBER"   # non-zero exit = stop
 ```
 
-Do not proceed on a non-zero exit. Add `pr` and `scope_label` to the running state.
-
-**Scope upgrade note (non-interactive).** Keep the repo-default scope; never prompt to upgrade
-mid-run. But if the diff touches paths likely identical across sibling repos
-(`.github/workflows/`, top-level `prompts/`, `docs/development/`, `docs/decisions/`, `CLAUDE.md`,
-`Makefile`/`pyproject.toml`, `.pre-commit-config.yaml`), add a one-line note to **both the PR body
-and the digest**: *"touches generic paths — consider `scope:shared` + `/port-pr` after merge."*
-The human decides on review; promoting to `scope:shared` is a reversible label edit — defer, don't park.
-
-**PR body** = `create_pr`'s template (see that skill for the full label/scope detail) **plus** two
-ship_issue additions: a short **`## Decisions`** section summarizing the run's decision log, and a
-**`- [ ] Compounding loop run — invariants harvested or skip-rationale recorded`** checklist box
-(the `learn` phase ticks it).
-
-## 6. review  →  `Skill(ship-review, <state>)`
-
-Reads `gh pr diff` in a fresh context (unbiased by authorship), checks it against the
-conventions / constitution / quality / completeness checklists, fixes findings (commit + push
-each), and checks the PR-body boxes. Returns once clean.
-
-## 7. learn  →  `Skill(ship-learn, <state>)`
-
-Waits for a reviewer verdict newer than the latest commit, central-judges each finding's
-legitimacy, and harvests genuinely-novel legitimate findings into the host repo's knowledge
-home — routed by tier (invariant / constitution / ADR) and only if it clears the admission bar.
-Idempotent via `docs(invariants|constitution|adr):` commit prefixes. Iterates to `APPROVED`
-(bounded); surfaces a yellow note on reviewer timeout / Lint failure rather than blocking.
-
-## 8. Enable auto-merge (orchestrator plumbing — no phase)
-
-```bash
-gh pr merge $PR_NUMBER --auto --squash --delete-branch
-```
-
-Works with `REVIEW_REQUIRED` branch protection. Do **not** use `--admin`. Skip and stop if the
-PR is still a draft, a required check is red, or the diff is large enough to want a human eye
-first (leave a review-request comment + note it).
+If the diff touches likely-shared paths (`.github/workflows/`, `prompts/`, `CLAUDE.md`,
+`Makefile`, `docs/decisions/`, …), add the one-line *"consider `scope:shared` + `/port-pr`
+after merge"* note to the PR body — the human decides on review; don't park.
 
 ---
 
-## 9. Done — the wake-up digest
+## 5. Independent review — only if armed
 
-Report:
-- PR URL
-- Auto-merge state — enabled / blocked (reason) / skipped (reason)
-- Worktree path (stays until the PR merges)
-- Compounding-loop result — invariants added / skip-rationale / yellow note
-- Any `parked` question (the `⚠ needs your call` line) or `failed` reason, if the run stopped early
-- Any follow-on issues to create (if scope narrowed during implementation)
+**If no signal armed it and `full` wasn't requested: skip, and record the reason** (e.g. "no
+review: no signals; 40-line localized diff, gate green"). Do not run review as ritual — a
+skipped-with-reason review is a feature, not a gap.
 
-If auto-merge landed the PR in this same run (interactive/CI fallback path only — under Agent
-View the harness owns the worktree lifecycle), sweep immediately for faster feedback rather than
-waiting for the next run's step-0 sweep to catch it:
+**If armed:** dispatch the fresh-context fork — authorship blindness is the one thing you
+cannot self-supply:
 
-```bash
-"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"     # add --dry-run to preview
 ```
+Skill(ship-review, "{\"issue\": <n>, \"pr\": <n>, \"base\": \"<base>\", \"worktree\": \"<abs-path>\", \"signals\": [\"S2\", ...]}")
+```
+
+It reviews the diff cold against conventions / constitution / quality / completeness, fixes
+findings (commit + push), respects recorded decisions (drift tripwire), and returns a terse
+findings report. Then: findings fixed → **the gate re-arms — re-run step 3**; a needs-human
+question → park with it.
 
 ---
 
-## When to bail (park, don't guess)
+## 6. Harvest — only if there is something to harvest
 
-- **Issue is actually two issues** → `ship-plan` parks asking to split it.
-- **Unresolved design decision** → park with options, don't pick arbitrarily.
-- **Tests fail in a way the phase doesn't understand** → `work`/`verify` first escalate to the `ce-debug` diagnosis skill (non-interactive); only if that can't root-cause-and-fix it does the phase return `failed` (push the branch, draft PR with the Debug Summary).
-- **Implementation would touch >8 files** → a sign the issue needs splitting; park.
+If the repo has a PR-review workflow (`.github/workflows/*review*`), wait bounded for its
+verdict — `gh pr checks --watch`, then
+`VERDICT=$("$CLAUDE_PLUGIN_ROOT/scripts/wait-for-review.sh" "<pr>" 600) || true` (polls
+reviews directly; never match workflow runs by SHA — `workflow_run` head SHAs are merge
+commits and never match). Timeout / no workflow → yellow note in the run record, move on;
+never block the ship.
 
-A `parked` or `failed` envelope from any phase stops the pipeline cleanly and hands back to the
-human via the digest — that is the design working, not a fault.
+- `CHANGES_REQUESTED` → address findings (≤3 iterations), commit + push, gate re-arms, wait
+  for a fresh verdict. Past 3 → stop and hand to the human.
+- Any **legitimate finding citing a rule not yet written down** (judge legitimacy first —
+  reviewers are sometimes confidently wrong; dismiss what's wrong) → harvest it into the host
+  repo's knowledge home per `KNOWLEDGE.md`: admission bar (*"would removing this rule let a
+  real mistake through?"*), tier routing (invariant / constitution / ADR), one-line
+  imperative, `docs(invariants|constitution|adr):` commit prefix for idempotency.
+- Clean review, nothing novel (the common case) → one line in the run record. **No finding,
+  no harvest work.**
+
+---
+
+## 7. Auto-merge, run record, digest
+
+**Closure-integrity check first (hard rule 5):** re-read the acceptance criteria against the
+final diff. Met → proceed. Diverged → post the scope-change comment on the issue now, or
+retarget `Closes` to a replacement issue.
+
+```bash
+gh pr merge $PR_NUMBER --auto --squash --delete-branch    # never --admin
+```
+
+Skip auto-merge (and say so) if the PR is a draft, a required check is red, or the diff is
+large enough to want a human eye first.
+
+**Post the run record** — a PR comment with a fenced JSON block (this is the plugin's
+self-pruning evidence; issue #15 aggregates these):
+
+```json
+{
+  "issue": 0, "pr": 0, "rigor": "signals|full-override|none",
+  "signals": ["S5", "S9"],
+  "plan": "posted|inline", "tracer_bullet": true,
+  "operational_questions": "answered-in-plan|n/a",
+  "review": { "ran": true, "reason": "S2 auth surface", "findings": 1, "contributed": true },
+  "gate": { "lint": "green", "tests": "38 passed", "evals": "routing.* 4/4", "reruns": 1 },
+  "harvest": { "ran": false, "reason": "clean review" },
+  "authority_grants": [], "escalations": [], "parked": null
+}
+```
+
+`contributed` is the load-bearing field: it is how ritual gets identified and deleted on
+evidence rather than argument.
+
+**Then the digest to the user:** PR URL · auto-merge state (enabled / blocked-why /
+skipped-why) · worktree path · signals fired and what each armed · what review/harvest
+actually contributed · any park question (`⚠ needs your call`) · follow-on issues to create
+(a split-out backfill issue goes here). If auto-merge landed the PR in-run (interactive/CI
+fallback path only), sweep worktrees immediately:
+`"$CLAUDE_PLUGIN_ROOT/scripts/prune-merged-worktrees.sh"`.
