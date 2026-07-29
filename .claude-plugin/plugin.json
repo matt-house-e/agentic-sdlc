@@ -1,6 +1,6 @@
 {
   "name": "agentic-sdlc",
-  "description": "End-to-end agentic SDLC for Claude Code: issue → branch → worktree → implement → PR → self-review → compounding loop → auto-merge. Repo-agnostic; reads each project's AGENTS.md (canonical knowledge home) for its invariants + constitution.",
+  "description": "End-to-end agentic SDLC for Claude Code: issue → worktree → pre-flight risk read → implement → authoritative gate → PR → risk-gated review → auto-merge, with a run record per PR. A single-context harness with hard authority boundaries. Repo-agnostic; reads each project's AGENTS.md (canonical knowledge home) for its invariants + constitution.",
   "author": {
     "name": "Matt House",
     "email": "matt.house.e@gmail.com"
