@@ -9,30 +9,41 @@ A Claude Code plugin for end-to-end agentic software development: from GitHub is
 
 | Skill | What it does |
 |---|---|
-| `/ship_issue <n>` | Ships issue `#n` end-to-end: plan → work → simplify → verify → PR → review → compounding loop → auto-merge. A **thin orchestrator** over six isolated phase-skills (see below) |
+| `/ship_issue <n>` | Ships issue `#n` end-to-end in **one coherent context**: pre-flight risk read → implement → one authoritative gate → PR → risk-gated independent review → opportunistic harvest → auto-merge → run record. A **harness** of hard gates around a free agent (see below) |
 | `/create_issue <text>` | Creates a GitHub issue with the right type / priority / component labels |
 | `/create_branch <n>` | Creates a feature branch from an issue, with the right type prefix and a derived slug |
 | `/create_pr <n>` | Opens a PR linked to issue `#n` with correct labels and a `Closes #n` link |
 | `/port-pr <n>` | Ports a merged `scope:shared` PR from one repo into its sibling — applies the diff, resolves conflicts, opens a mirror PR with `Mirrors <owner>/<repo>#<n>` in the body |
-| `/ce-debug <ref>` | Systematic bug diagnosis — traces the full causal chain before fixing, test-first. **Vendored** (pinned) from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin); see `skills/ce-debug/VENDORED.md`. Also runs non-interactively inside `/ship_issue` when `work`/`verify` hit a failure they can't explain |
+| `/ce-debug <ref>` | Systematic bug diagnosis — traces the full causal chain before fixing, test-first. **Vendored** (pinned) from [EveryInc/compound-engineering-plugin](https://github.com/EveryInc/compound-engineering-plugin); see `skills/ce-debug/VENDORED.md`. Also runs non-interactively inside `/ship_issue` when implementation or the gate hits a failure it can't explain |
 
-**Phase-skills** (in `skills/ship-*/`) — the six stages `/ship_issue` runs in order, each in a
-**fresh, isolated context** (`context: fork`) that hands a small JSON envelope back to the
-orchestrator. They are internal (`user-invocable: false`) — the orchestrator invokes them, you don't:
+**The harness** — `/ship_issue` is no longer a phase pipeline. One agent runs the whole issue
+in one coherent context, surrounded by the things it cannot talk its way past:
 
-| Phase-skill | What it does |
-|---|---|
-| `ship-plan` | Understands the issue, self-grills the approach, breaks it into atomic tasks, runs a fresh-Claude plan stress-test, writes the approach + decisions to the issue |
-| `ship-work` | Implements one task at a time (single-threaded, full context; delegates the heavy loop to an implementer-tier subagent), lint+test+commit per task |
-| `ship-simplify` | Dispatches `code-simplifier`, applies its cleanups, commits them separately |
-| `ship-verify` | The deterministic spine — lint **and** format, tests, filtered evals; fails closed on any red gate |
-| `ship-review` | Fresh-context self-review of the PR diff (unbiased by authorship) against conventions / constitution / quality / completeness |
-| `ship-learn` | The compounding loop — harvests legitimate, novel review findings into the host repo's knowledge home, routed by tier |
+- **Hard rules (authority boundaries)** — shipping ≠ deploying (production needs an explicit
+  human grant), no backfills/bulk mutations coupled to first rollout, no at-scale external
+  writes, never merge past a red check, closure integrity (`Closes #n` requires the AC met or
+  a scope-change record on the issue).
+- **A pre-flight risk read** — a deterministic signal table (migrations, auth, new deps, LLM
+  behavior, queues/workers, bulk data, external writes, production data, cross-component
+  scope, deploy/infra, ambiguous AC) that arms safeguards: a posted plan, operational
+  questions (volume / cost / failure behavior / starvation / kill switch / rollback), a
+  tracer-bullet slice for cross-component work, and independent review. Signals arm; nothing
+  disarms mid-run.
+- **One authoritative gate** — lint **and** format, full tests, filtered evals; fail closed;
+  **re-armed by any post-gate commit** (review fixes included).
+- **Risk-gated independent review** — the `ship-review` fork (`context: fork`,
+  `user-invocable: false`) reads the diff cold, unbiased by authorship, fixes findings, and
+  returns a terse report. It runs only when a signal armed it (or the user forces `full`);
+  skipped reviews record their reason.
+- **Opportunistic harvest** — a legitimate, novel review finding is folded into the host
+  repo's knowledge home under `KNOWLEDGE.md`'s admission bar; a clean review dispatches
+  nothing.
+- **A run record** — every run posts a machine-readable PR comment recording which signals
+  fired, what ran/skipped and why, and what each step actually contributed — the evidence
+  base for pruning the process itself (see `design/10-harness.md`).
 
-The hand-off between phases is governed by a **state-envelope contract**
-(`skills/ship_issue/CONTRACT.md`): a thin JSON envelope (handles + status + an append-only
-decisions ledger + one prose line) over a re-readable substrate (the issue, PR diff, and commits).
-This is what keeps decomposition from drifting — see the contract for the full rationale.
+Subagents remain tools, not stages: an implementer-tier loop for token-heavy work and the
+`code-simplifier` agent for over-built diffs, dispatched at the harness's discretion.
 
 **Agents** (in `agents/`):
 
@@ -98,7 +109,7 @@ Plugin skills take precedence over repo-level `.claude/commands/*.md` and `.clau
 
 ## Where the per-repo bits live
 
-Each project's `CLAUDE.md` should include a `## Repo invariants` section listing one-line rules that PRs must satisfy. The compounding loop — `/ship_issue`'s `ship-learn` phase — grows this section over time: when the auto-reviewer flags a violation of a rule that isn't yet written down, the rule is appended automatically.
+Each project's `CLAUDE.md` should include a `## Repo invariants` section listing one-line rules that PRs must satisfy. The compounding loop — `/ship_issue`'s harvest step — grows this section over time: when a review flags a violation of a rule that isn't yet written down, the rule is appended automatically (admission bar permitting).
 
 Examples of repo-invariant rules (drawn from real Lucanet servicedesk repos):
 
@@ -145,6 +156,7 @@ A future enhancement will auto-dispatch `/port-pr` from a GitHub Action on `scop
 
 ## Status
 
+- Harness rewrite (2026-07-29, closes #26) — deleted the six-phase orchestrator + state-envelope contract; `/ship_issue` is now a **single-context harness**: hard authority boundaries, a deterministic pre-flight signal table, one authoritative re-arming gate, risk-gated `ship-review` (the only surviving fork), opportunistic harvest, and a machine-readable run record per PR (feeds #15). Constitution gained an *Operational safety* section. Rationale + evidence: `design/10-harness.md`
 - v0.6.0 — Phase 4: vendored a pinned `ce-debug` diagnosis skill (MIT, EveryInc/compound-engineering-plugin @ `compound-engineering-v3.16.0`) — fills the root-causing gap; adapted to our conventions (dual interactive/non-interactive modes, no branch creation, hands off to `create_pr`/`ship_issue`); wired into `work`/`verify` so an unexplained failure escalates to structured diagnosis before parking
 - v0.5.0 — Phase 3: decomposed `/ship_issue` into six isolated `SKILL.md` phase-skills (`ship-plan/work/simplify/verify/review/learn`) behind a **state-envelope contract** (`skills/ship_issue/CONTRACT.md`); `/ship_issue` is now a thin orchestrator; migrated all `commands/` to the portable `skills/` format
 - v0.4.0 — Phase 2: two-tier knowledge model (`KNOWLEDGE.md`) — invariants (enforced) + constitution (justify-or-deviate); installable `templates/constitution.md`; compounding loop central-judges findings + admission bar + tier routing; `code-simplifier` reads the constitution
