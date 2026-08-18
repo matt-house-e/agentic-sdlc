@@ -45,28 +45,35 @@ If any check fails, fix it before opening the PR — don't open a PR with a red 
 
 ## 2. Commit-type / scope from labels
 
-Read the source issue's labels:
+**Start from the issue title.** Issues are titled `<type>(<scope>): description` (see
+`create_issue`), which is already the PR title — append ` (#<issue-number>)` and you're done. Only
+rewrite it when the shipped work turned out to be something other than what the issue described.
 
 ```bash
-gh issue view <issue-number> --json labels --jq '.labels[].name'
+gh issue view <issue-number> --json title,labels --jq '{title, labels: [.labels[].name]}'
 ```
 
-Map `type:*` → commit type:
+If the issue predates the convention (a legacy `[Type]: [Component] Description` title, or free
+prose), derive the type from the `type:*` label:
 
 | Issue label | Commit type |
 |---|---|
 | `type:story` | `feat` |
-| `type:task` | `chore` (or `refactor` / `perf` / `test` if more specific) |
+| `type:task` | `task` (or `refactor` / `perf` / `test` / `ci` if more specific) |
 | `type:bug` | `fix` |
-| `type:spike` | `chore` |
+| `type:spike` | the type of what actually shipped — usually `docs` (the finding) or `chore` |
 | `type:epic` | `feat` |
 
-`spike` is not a Conventional Commits type — mapping it to a real one (`chore`) keeps the final
-commit from being rejected by any repo that lints commit messages against the standard CC type
-set. The branch prefix (`spike/`) still carries the spike semantics; the commit type doesn't need
-to.
+`task` and `spike` are not Conventional Commits types. `task` mirrors the issue type and is the
+standard here — nothing lints commit types in these repos. In a repo that *does* lint against the
+standard CC set, use `chore` / `refactor` / `ci` instead; the branch prefix (`task/`, `spike/`)
+carries the semantics either way.
 
-Map `component:*` → scope. Use whichever component label the repo actually has — `component:ci` and `component:ci-cd` are both valid; don't invent. Common mappings:
+Map `component:*` → scope. Prefer the **precise area** over the label name when they differ — the
+component vocabulary is coarse on purpose, so an issue labelled `component:data` about the taxonomy
+ships as `fix(taxonomy): …`, not `fix(data): …`. For *labels*, use whichever the repo actually has —
+`component:ci` and `component:ci-cd` are both valid; don't invent. Default scope mappings when the
+area has no better name:
 
 | Component label | Scope |
 |---|---|

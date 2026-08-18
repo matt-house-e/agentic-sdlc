@@ -63,18 +63,37 @@ If the relevant area doesn't have a matching label, mention this in the issue bo
 
 ## 4. Craft the title
 
+Conventional Commits, imperative mood — the same form the branch, PR title, and squash commit will carry:
+
 ```
-[Type]: [Component] Description
+<type>(<scope>): the change you want, no trailing period
 ```
 
-Max 60 characters. Examples:
+Max 70 characters. **No `(#123)` suffix** — the issue number belongs on the PR title only.
 
-- `[Story]: [UI] Add file upload capability`
-- `[Bug]: [Workflow] Conversation node crashes on empty input`
-- `[Task]: [Service] Refactor LLM service for better testing`
-- `[Spike]: [API] Investigate JSM Cloud rate limits`
+- `<type>` mirrors the `type:*` label: `feat` (story), `fix` (bug), `task` (task), `spike` (spike), `epic` (epic). Use `docs` / `refactor` / `perf` / `test` / `chore` / `ci` where one describes the work better.
+- `<scope>` is the area of the tree — free-form and finer-grained than the `component:*` label vocabulary (`taxonomy`, `analytics`, `knowledgebase`, `jsm`). Keep the precision here; the coarse label goes in the label set.
+- The description states the **outcome wanted**, imperative, like a commit subject — not the symptom.
 
-If this repo uses a different title convention (e.g. conventional-commits style, or no `[Component]` prefix), follow what `gh issue list --limit 20` shows. Match existing style.
+Examples:
+
+- `feat(ui): add file upload to the chat composer`
+- `fix(workflow): stop the conversation node crashing on empty input`
+- `task(llm): split the LLM service so it can be tested without the API`
+- `spike(api): find the JSM Cloud rate limits`
+
+Symptom → outcome, for bugs:
+
+| Don't | Do |
+|---|---|
+| `fix(ci): kb-sync PRs never trigger CI` | `fix(ci): let kb-sync PRs trigger CI` |
+| `fix(taxonomy): is_active does nothing` | `fix(taxonomy): make is_active actually deactivate a row` |
+
+**Why this form:** coding agents have no built-in issue-title convention, so they imitate the repo's commit history — which is Conventional Commits. Any other form drifts the moment an issue is filed without this skill loaded. It also lets the title travel **issue → branch slug → PR title (plus `(#123)`) → squash commit** with no rewrite step.
+
+`task` and `spike` are not Conventional Commits types. They mirror the issue type, and nothing lints commit types in these repos; if a repo *does* lint them, use `chore` / `refactor` / `ci`.
+
+If a repo documents a different convention in `docs/development/github-standards.md`, that wins. Otherwise check `gh issue list --limit 20`: a repo with an established different style keeps it — but don't treat a handful of legacy bracketed titles (`[Task]: [Service] …`) as the convention. They predate this rule and are not renamed.
 
 ---
 
