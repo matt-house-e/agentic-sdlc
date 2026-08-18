@@ -71,7 +71,8 @@ if [ "$(git rev-parse --git-common-dir)" != "$(git rev-parse --git-dir)" ]; then
   ```
 
 `<type>` from labels (type:story→feat, type:task→task, type:bug→fix, type:spike→spike,
-type:epic→epic); `<slug>` from the title (lowercase, hyphens, ~40 chars).
+type:epic→epic); `<slug>` from the title with its `<type>(<scope>):` prefix stripped — or a legacy
+`[Type]: [Component]` one — then lowercase, hyphens, ~40 chars.
 
 ---
 

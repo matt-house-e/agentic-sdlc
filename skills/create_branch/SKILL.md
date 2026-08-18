@@ -30,7 +30,8 @@ These match Conventional Commits and the `gh pr create` defaults across the repo
 ## 3. Derive the slug
 
 From the title:
-- Strip the `[Type]: [Component]` prefix if present
+- Strip the `<type>(<scope>):` prefix — the branch prefix already carries the type, and the scope reappears in the PR title
+- Strip a legacy `[Type]: [Component]` prefix too, on older issues
 - Lowercase
 - Replace whitespace and special chars with `-`
 - Collapse multiple `-` into one
@@ -72,7 +73,7 @@ Report:
 
 ## Don't
 
-- Don't include `[Type]:` or `[Component]` brackets in the branch name
-- Don't include special characters
+- Don't carry the title's `<type>(<scope>):` prefix (or a legacy `[Type]: [Component]` one) into the branch name
+- Don't include special characters — `(`, `)`, and `:` from the title prefix are the usual offenders
 - Don't keep the description too long (~40 chars max)
 - Don't branch from a stale `main` — pull first
