@@ -2,6 +2,7 @@
 name: ship_issue
 description: Ship a GitHub issue end-to-end in one coherent context — pre-flight risk read, implement with focused tests, one authoritative gate, risk-gated independent review, PR, auto-merge, run record. A harness of hard gates around a free agent.
 argument-hint: <issue-number> [base-branch] [full]
+effort: high
 ---
 
 Ship issue #$ARGUMENTS from first read to merged PR.
@@ -16,6 +17,14 @@ issue, assess risk, plan at the depth the risk demands, implement, gate, ship. W
 the pipeline is a set of **hard rules and gates you cannot skip or reorder** — everything else
 (how you plan, when you delegate, what you read) is your judgment. See
 `design/10-harness.md` for why.
+
+**The issue is the spec.** Design conversation — brainstorming, grilling — happens before the
+issue exists, with the user present; this run executes the issue. Open design decisions are
+signal S11, and the answer is to park, not to start a design conversation mid-run.
+
+Model and effort per role come from `MODELS.md`: this run is the `orchestrator` at `high`
+effort (set in this skill's frontmatter); pass `model` and `effort` explicitly on each of
+your own `Agent` dispatches below.
 
 ---
 
@@ -101,8 +110,9 @@ disarm a triggered safeguard mid-run (judgment escalates, never de-escalates).
 - **Any signal fired (or `full` requested)** → the plan is **posted as an issue comment**
   (approach, task list, key decisions *with rejected alternatives*) before implementation, and
   the **independent review** (step 5) is armed. For genuinely hard designs, also stress-test
-  the plan with one fresh subagent (`Agent`, `general-purpose`, self-contained prompt,
-  foreground) asking *"would you ship this plan — what's wrong or missing?"*.
+  the plan with one fresh `plan-critic` subagent (`Agent`, `general-purpose`, `model: opus` —
+  `fable` for the hardest — `effort: high`, self-contained prompt, foreground) asking *"would
+  you ship this plan — what's wrong or missing?"*.
 - **S5–S8** → the posted plan must additionally answer the **operational questions**: expected
   volume (how many records/requests, measured not guessed), cost (which model/API, worst
   case), failure behavior (timeout, permanent failure, is the primary user path fail-open?),
@@ -119,6 +129,12 @@ disarm a triggered safeguard mid-run (judgment escalates, never de-escalates).
 **Park (stop, ask, leave the branch in place) when:** S11 fires; the issue is really two
 issues; implementation would touch >8 files (split signal); or a hard rule conflicts with the
 spec. Parking is the design working, not a failure.
+
+A park names the user's next step in the digest: `/grilling` to settle an open design fork
+together, `/to-questionnaire` when someone else holds the answer, and `/handoff` so a fresh
+session can resume the parked branch — whichever of these skills the user has installed. The
+answers go into the issue's acceptance criteria before `/ship_issue` reruns; a decision
+settled only in chat never reaches the next run.
 
 ---
 
@@ -143,12 +159,22 @@ If implementation proves the plan wrong — **stop, correct the plan** (update t
 comment if one exists), then re-implement cleanly. The plan is malleable; the spec (acceptance
 criteria) is immutable — never silently widen or narrow scope (hard rule 5).
 
-**Delegation is a tool, not a stage.** For a token-heavy loop, dispatch **one**
-implementer-tier subagent (`Agent`, `general-purpose`, `model: sonnet` per `MODELS.md`) with a
-self-contained prompt (task list, binding invariants, worktree path, the per-task protocol
-above). Single-threaded always — never parallel writers. For a large diff that smells
-over-built, dispatch `code-simplifier` and vet its edits against your recorded decisions
-before committing. **Every nested `Agent` dispatch runs in the foreground**
+**Delegation is a tool, not a stage.** For a long, mechanical, token-heavy loop, dispatch
+**one** `implementer` subagent (`Agent`, `general-purpose`, `model: sonnet`, `effort: medium`)
+with a self-contained prompt: task list, binding invariants, worktree path, the per-task
+protocol above, and this verbatim — *"When you change code that can be run, built, or
+type-checked, run a real check that exercises the change before reporting it done: the
+project's tests, type-checker, or build, or the changed command itself. A syntax-only check,
+or a check command that failed to start, does not count. Only if no real check can run here,
+say which one you did not run and why instead of reporting the change as done."* Short loops
+stay in your own context: the hand-off's re-read costs more than the cheaper tier saves.
+
+Writers are single-threaded — never two agents editing the worktree. Independent
+**read-only** work (call sites, prior art, logs) can go to `reader` subagents (`model:
+haiku`, or `sonnet` when the read needs judgment; `effort: low`–`medium`) dispatched together
+in one message so they run in parallel. For a large diff that smells over-built, dispatch
+`code-simplifier` (`model: sonnet`, `effort: medium`) and vet its edits against your recorded
+decisions before committing. **Every nested `Agent` dispatch runs in the foreground**
 (`run_in_background: false`) — you are the caller waiting on the result; a backgrounded
 dispatch ends your turn on an interim status line.
 

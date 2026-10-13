@@ -60,8 +60,9 @@ versioned and testable (run `bash scripts/tests/run.sh`):
 | `wait-for-review.sh <pr> [timeout]` | Blocks until a PR review is submitted newer than the latest commit (polls reviews, not workflow runs by SHA); prints the verdict |
 | `prune-merged-worktrees.sh [--dry-run]` | Removes `ship_issue`'s own `*-wt-*` worktrees and the harness's `.claude/worktrees/*` ones once `gh` confirms a merged PR for the branch (not ref-existence, which can't tell "merged" from "never pushed"); runs automatically at the start of every `/ship_issue` run, not just after auto-merge |
 
-**Model roles** — `MODELS.md` maps capability roles (`planner`/`implementer`/`reviewer`/`grunt`)
-to model tier aliases, so model choice is one edit and the pipeline auto-rides upgrades.
+**Model roles** — `MODELS.md` maps capability roles (`orchestrator`/`reviewer`/`plan-critic`/
+`implementer`/`simplifier`/`reader`) to a model tier alias plus an effort level, with the place
+Claude Code enforces each, so model choice is one edit and the pipeline auto-rides upgrades.
 
 **Knowledge layer** — `KNOWLEDGE.md` defines the two-tier model the compounding loop feeds:
 **invariants** (taste/convention — enforced) and the **constitution** (best-practice
