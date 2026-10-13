@@ -159,9 +159,12 @@ If implementation proves the plan wrong — **stop, correct the plan** (update t
 comment if one exists), then re-implement cleanly. The plan is malleable; the spec (acceptance
 criteria) is immutable — never silently widen or narrow scope (hard rule 5).
 
-**Delegation is a tool, not a stage.** For a long, mechanical, token-heavy loop, dispatch
-**one** `implementer` subagent (`Agent`, `general-purpose`, `model: sonnet`, `effort: medium`)
-with a self-contained prompt: task list, binding invariants, worktree path, the per-task
+**Delegation is a tool, not a stage.** For a long, token-heavy loop, dispatch **one**
+`implementer` subagent (`Agent`, `general-purpose`, `effort: medium`) — `model: sonnet` when
+the loop is well-scoped and mechanical, `model: opus` when it needs judgment (open-ended,
+cross-component, a migration or refactor, or any of S1/S2/S4/S9); see `MODELS.md` → *Choosing
+the implementer*. An Opus implementer buys context isolation, not savings. Give it a
+self-contained prompt: task list, binding invariants, worktree path, the per-task
 protocol above, and this verbatim — *"When you change code that can be run, built, or
 type-checked, run a real check that exercises the change before reporting it done: the
 project's tests, type-checker, or build, or the changed command itself. A syntax-only check,
