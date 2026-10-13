@@ -17,7 +17,7 @@ needs `background: false`.
 | `orchestrator` | the session model, chosen by the user at launch: `opus` by default; `fable` when the issue reads as long-horizon or ambiguous at scale (an epic, or several cost-of-wrong areas at once) | `high` | effort: `ship_issue` frontmatter; model: the launch command | risk read, plan, implementation judgment, gate, digest |
 | `reviewer` | session model | `xhigh` | `ship-review` frontmatter | the armed independent review (it only runs when a risk signal fired) |
 | `plan-critic` | `opus` (`fable` for the hardest designs) | `high` | Agent dispatch | "would you ship this plan — what's wrong or missing?" |
-| `implementer` | `sonnet` | `medium` | Agent dispatch | the delegated token-heavy coding loop |
+| `implementer` | `sonnet` for well-scoped loops; `opus` for loops that need judgment | `medium` | Agent dispatch | the delegated long coding loop — see *Choosing the implementer* below |
 | `simplifier` | `sonnet` | `medium` | Agent dispatch | the `code-simplifier` agent on an over-built diff |
 | `reader` | `haiku` (`sonnet` when the read needs judgment) | `low`–`medium` | Agent dispatch | read-only scans: call sites, prior art, logs |
 
@@ -34,13 +34,36 @@ resolve differently on Bedrock / Vertex / Foundry — check the platform's table
 |---|---|---|---|---|
 | `fable` | Claude Fable 5.1 | $10 / $50 | Long-horizon autonomous work, navigating ambiguity, code review and debugging, coordinating parallel sub-agents | Single requests run many minutes at high effort; can over-plan ambiguous work; the most expensive tier, and subagents draw on the session's quota — never fan it out across many subagents |
 | `opus` | Claude Opus 5.5 | $4 / $20 | The default orchestrator and reviewer: strong judgment at under half Fable's price | Thinking is always on and effort is the only control; its default is `medium`, so set effort explicitly; frontend work without named anti-patterns drifts to stock styles |
-| `sonnet` | Claude Sonnet 5.5 | $2 / $10 | Multistep agentic coding in a real repository — its strongest area — at half Opus's price | Effort levels are recalibrated (start at `medium` for agentic coding); at low effort it can report a change done without running a check, so always pass the real-check instruction |
+| `sonnet` | Claude Sonnet 5.5 | $2 / $10 | Well-scoped coding at half Opus's price: settled plans, repetitive edits, work the tests fully define; leads Opus on terminal-style tasks | Behind Opus on ambiguous, multi-file work; costs about the same as Opus once pushed to `high` effort, and scores lower at `max` than at `xhigh` — keep it at `medium`; at low effort it can report a change done without running a check, so always pass the real-check instruction |
 | `haiku` | Claude Haiku 5.5 | $0.10 / $0.50 (prompts ≤100K tokens; $0.50 / $2.50 beyond) | Mechanical, read-only work at a twentieth of Sonnet's price | Defaults to `medium`; at `low` in long prompts it can stop early or skip verification — keep it off writing and verification jobs |
 
-**Cost shape.** Opus costs about 2× Sonnet, so handing a short loop to the implementer saves
-less than the hand-off's context re-read costs: delegate only long, mechanical loops. Haiku
-makes broad read-only scans nearly free, so spend it on readers rather than the orchestrator's
-context.
+**Cost shape.** Opus lists at 2× Sonnet, but customers on its launch page report it finishing
+coding tasks in a third to half fewer steps and with fewer tokens, so the per-task gap is
+smaller than the list price suggests. Handing a short
+loop to an implementer saves less than the hand-off's context re-read costs: delegate only long
+loops. Haiku makes broad read-only scans nearly free, so spend it on readers rather than the
+orchestrator's context.
+
+## Choosing the implementer
+
+Pick by how much judgment the loop needs, not by price alone:
+
+- **`sonnet`, `medium`** — the loop is well-scoped: the plan is settled, the edits are
+  repetitive (one pattern across many files, renames, test backfill), and the tests define
+  done. This is where Sonnet's lower price is a real saving.
+- **`opus`, `medium`** — the loop needs judgment: open-ended or ambiguous work, changes that
+  span components, non-mechanical migrations and refactors, or any cost-of-wrong signal (S1,
+  S2, S4, S9). If any of these applies, use `opus`, even when the loop also looks repetitive.
+  `medium` is enough because the implementer executes the orchestrator's plan rather than
+  making it, and Opus 5.5 at `medium` already beats Opus 5 at `max` on Anthropic's coding
+  evals. Delegating to an Opus implementer buys context isolation for a long loop, not a
+  lower bill; when context isn't the problem, implement in your own session instead.
+- **Never `sonnet` at `high` or above** — at that effort it costs about the same as Opus, with
+  less capability on hard work.
+
+Sources: Anthropic's launch pages for Opus 5.5 and Sonnet 5.5 (checked 2026-10-13) —
+CursorBench 4.0 57.8% vs 55.5% and FrontierCode 1.1 54.4% vs 52.1% for Opus; Terminal-Bench
+4.0 70.6% vs 66.4% for Sonnet.
 
 ## Aliases vs pinned IDs
 
