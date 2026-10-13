@@ -23,8 +23,8 @@ issue exists, with the user present; this run executes the issue. Open design de
 signal S11, and the answer is to park, not to start a design conversation mid-run.
 
 Model and effort per role come from `MODELS.md`: this run is the `orchestrator` at `high`
-effort (set in this skill's frontmatter); pass `model` and `effort` explicitly on every
-`Agent` dispatch below.
+effort (set in this skill's frontmatter); pass `model` and `effort` explicitly on each of
+your own `Agent` dispatches below.
 
 ---
 
@@ -132,7 +132,9 @@ spec. Parking is the design working, not a failure.
 
 A park names the user's next step in the digest: `/grilling` to settle an open design fork
 together, `/to-questionnaire` when someone else holds the answer, and `/handoff` so a fresh
-session can resume the parked branch — whichever of these skills the user has installed.
+session can resume the parked branch — whichever of these skills the user has installed. The
+answers go into the issue's acceptance criteria before `/ship_issue` reruns; a decision
+settled only in chat never reaches the next run.
 
 ---
 

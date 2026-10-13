@@ -12,7 +12,7 @@ Create a GitHub issue from the user's description in `$ARGUMENTS`, following thi
 
 If the request is too vague to scope (no clear outcome, ambiguous between feature and bug, etc.), ask one specific clarifying question before creating. Don't guess on the parts that determine the label set.
 
-If the request leaves design decisions open — what the system should *do*, not just how — settle them with the user before writing acceptance criteria, using the `grilling` skill when it's installed. `/ship_issue` treats the issue as the spec and parks on open decisions, so they're cheapest to resolve here.
+That question covers scoping. Design forks are different: if the request leaves decisions open — what the system should *do*, not just how — settle them with the user before writing acceptance criteria, using the `grilling` skill when it's installed. `/ship_issue` treats the issue as the spec and parks on open decisions, so they're cheapest to resolve here.
 
 ---
 

@@ -15,7 +15,8 @@ A repo without an `AGENTS.md` keeps its knowledge in a hand-maintained `CLAUDE.m
 the loop writes to `CLAUDE.md` and leaves creating an `AGENTS.md` to the user.
 
 Write each harvested rule following the `writing-for-agents` skill when it's installed: one
-meaning in one place, positive phrasing, and no line the model already obeys by default.
+meaning in one place, a reason beside each prohibition, and no line the model already obeys by
+default.
 
 ## Two tiers, two authorities
 
