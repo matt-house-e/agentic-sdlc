@@ -162,7 +162,8 @@ criteria) is immutable — never silently widen or narrow scope (hard rule 5).
 **Delegation is a tool, not a stage.** For a long, token-heavy loop, dispatch **one**
 `implementer` subagent (`Agent`, `general-purpose`, `effort: medium`) — `model: sonnet` when
 the loop is well-scoped and mechanical, `model: opus` when it needs judgment (open-ended,
-cross-component, a migration or refactor, or any of S1/S2/S4/S9); see `MODELS.md` → *Choosing
+cross-component, a non-mechanical migration or refactor, or any of S1/S2/S4/S9 — any one of
+these wins over "looks repetitive"); see `MODELS.md` → *Choosing
 the implementer*. An Opus implementer buys context isolation, not savings. Give it a
 self-contained prompt: task list, binding invariants, worktree path, the per-task
 protocol above, and this verbatim — *"When you change code that can be run, built, or
@@ -170,7 +171,8 @@ type-checked, run a real check that exercises the change before reporting it don
 project's tests, type-checker, or build, or the changed command itself. A syntax-only check,
 or a check command that failed to start, does not count. Only if no real check can run here,
 say which one you did not run and why instead of reporting the change as done."* Short loops
-stay in your own context: the hand-off's re-read costs more than the cheaper tier saves.
+stay in your own context: a hand-off's re-read outweighs what a cheaper tier saves, and an
+Opus hand-off saves nothing but context.
 
 Writers are single-threaded — never two agents editing the worktree. Independent
 **read-only** work (call sites, prior art, logs) can go to `reader` subagents (`model:
