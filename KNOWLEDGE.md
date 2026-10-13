@@ -11,6 +11,12 @@ repo holds the actual knowledge.
 `CLAUDE.md` is generated/imported from it. **The loop writes to `AGENTS.md`.**
 Never hand-edit the generated `CLAUDE.md`; regenerate it.
 
+A repo without an `AGENTS.md` keeps its knowledge in a hand-maintained `CLAUDE.md`: there,
+the loop writes to `CLAUDE.md` and leaves creating an `AGENTS.md` to the user.
+
+Write each harvested rule following the `writing-for-agents` skill when it's installed: one
+meaning in one place, positive phrasing, and no line the model already obeys by default.
+
 ## Two tiers, two authorities
 
 | Tier | What it is | Example | Authority |
@@ -69,6 +75,6 @@ signal than a rule that is merely old.
 
 | Knowledge | Home |
 | --- | --- |
-| Invariants + constitution | `AGENTS.md` |
-| The *why* of big calls | `docs/decisions/` ADRs |
+| Invariants + constitution | `AGENTS.md` (or `CLAUDE.md`, see above) |
+| The *why* of big calls | The repo's existing ADR folder (default `docs/decisions/`) — one numbered series; never start a second |
 | Per-issue intent | The GitHub issue / PR (not a repo file) |
