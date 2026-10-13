@@ -2,6 +2,8 @@
 name: ship-review
 description: Risk-gated independent review for /ship_issue (do not invoke directly). Reads the PR diff in a fresh context unbiased by authorship, checks it against conventions / constitution / quality / completeness, fixes findings, and returns a terse findings report.
 context: fork
+background: false
+effort: xhigh
 user-invocable: false
 argument-hint: <review-args-json>
 ---
